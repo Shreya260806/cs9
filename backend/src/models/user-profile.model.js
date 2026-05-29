@@ -29,21 +29,6 @@ const userProfileSchema = new mongoose.Schema(
       default: 0,
     },
     phone: String,
-    kyc: {
-      id_type: String,
-      id_number: String,
-      verified: Boolean,
-      verified_at: Date,
-    },
-    course: {
-      name: String,
-      enrolled_on: Date,
-      refund_eligible: Boolean,
-    },
-    files: {
-      profile_photo_url: String,
-      supporting_doc_url: String,
-    },
     credentials_url: String,
     expertise: [String],
     categories: [String],
@@ -64,5 +49,8 @@ const userProfileSchema = new mongoose.Schema(
 )
 
 userProfileSchema.index({ display_name: 1 })
+userProfileSchema.index({ expertise: 1 })
+userProfileSchema.index({ categories: 1 })
+userProfileSchema.index({ tags: 1 })
 
 export default mongoose.model('UserProfile', userProfileSchema)

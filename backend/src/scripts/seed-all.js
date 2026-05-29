@@ -113,16 +113,17 @@ async function seedUsers() {
       email: u.email,
       passwordHash,
       status: 'active',
-      is_expert: u.is_expert ?? false,
-      is_verified_expert: u.is_verified_expert ?? false,
-      expert_type: u.expert_type ?? null,
-      specialty: u.specialty ?? null,
       spark_points: u.spark_points,
     })
 
     const role = await ensureRole(u.role)
     await UserRoleMapper.create({ user_id: user.user_id, role_id: role.role_id })
-    await UserProfile.create({ user_id: user.user_id, display_name: user.name })
+    await UserProfile.create({
+      user_id: user.user_id,
+      display_name: user.name,
+      expertise: u.specialty ? [u.specialty] : [],
+      tags: u.expert_type ? [u.expert_type] : [],
+    })
 
     console.log(`  ✓ Created user: ${u.email}`)
     created.push(user)

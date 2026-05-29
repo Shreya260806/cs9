@@ -41,22 +41,6 @@ const userSchema = new mongoose.Schema(
     },
     status_updated_by: String,
     status_updated_at: Date,
-    is_expert: {
-      type: Boolean,
-      default: false,
-    },
-    is_verified_expert: {
-      type: Boolean,
-      default: false,
-    },
-    expert_type: {
-      type: String,
-      trim: true,
-    },
-    specialty: {
-      type: String,
-      trim: true,
-    },
     spark_points: {
       type: Number,
       default: 0,
