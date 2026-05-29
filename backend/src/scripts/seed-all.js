@@ -16,9 +16,8 @@ import Answer from '../models/answer.model.js'
 import Comment from '../models/comment.model.js'
 import Notification from '../models/notification.model.js'
 import Flag from '../models/flag.model.js'
-import SparkTransaction from '../models/spark-transaction.model.js'
 import { ensureRole, getMappedRoles } from '../services/role.service.js'
-import { awardSpark } from '../services/spark.service.js'
+import { awardSpark, reserveBounty } from '../services/spark.service.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,7 +112,6 @@ async function seedUsers() {
       email: u.email,
       passwordHash,
       status: 'active',
-      spark_points: u.spark_points,
     })
 
     const role = await ensureRole(u.role)
@@ -124,6 +122,14 @@ async function seedUsers() {
       expertise: u.specialty ? [u.specialty] : [],
       tags: u.expert_type ? [u.expert_type] : [],
     })
+
+    if (u.spark_points > 0) {
+      await awardSpark({
+        userId: user.user_id,
+        action: 'SEED_INITIAL_BALANCE',
+        points: u.spark_points,
+      })
+    }
 
     console.log(`  ✓ Created user: ${u.email}`)
     created.push(user)
@@ -347,13 +353,7 @@ async function seedDiscussions(users) {
     })
 
     if (disc.spark_bounty > 0) {
-      await SparkTransaction.create({
-        user_id: disc.author_id,
-        action: 'QUESTION_BOUNTY',
-        points: -disc.spark_bounty,
-        reference_id: question.question_id,
-        reference_type: 'question',
-      })
+      await reserveBounty(disc.author_id, disc.spark_bounty, question.question_id)
     }
 
     console.log(`  ✓ Created discussion [${disc.status}]: ${question.title.slice(0, 40)}…`)

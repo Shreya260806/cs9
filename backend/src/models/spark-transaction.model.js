@@ -20,6 +20,7 @@ const sparkTransactionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    // Signed ledger entry. Source of truth for spark balances.
     points: {
       type: Number,
       required: true,
@@ -37,5 +38,7 @@ const sparkTransactionSchema = new mongoose.Schema(
 )
 
 sparkTransactionSchema.index({ user_id: 1, created_at: -1 })
+sparkTransactionSchema.index({ reference_type: 1, reference_id: 1 })
+sparkTransactionSchema.index({ action: 1, created_at: -1 })
 
 export default mongoose.model('SparkTransaction', sparkTransactionSchema)

@@ -15,6 +15,10 @@ export const SPARK_POINTS = {
   BOUNTY_AWARDED: null,    // positive, set dynamically from question.spark_bounty
 }
 
+// Spark ownership rule:
+// - spark_transactions is the ledger/source of truth.
+// - users.spark_points is a cache balance owned by this service and the
+//   spark reconciliation script only.
 // Reputation = a trust/quality signal (distinct from spark engagement points).
 // Only quality-signal actions move it. Used by the leaderboard + profile.
 export const REPUTATION_POINTS = {

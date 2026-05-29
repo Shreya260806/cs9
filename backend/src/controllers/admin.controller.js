@@ -63,7 +63,7 @@ export async function getAdminDashboard(req, res, next) {
       Flag.countDocuments(openFlagFilter),
       SparkTransaction.aggregate([
         { $match: { created_at: periodFilter.created_at || {} } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $group: { _id: null, total: { $sum: '$points' } } },
       ]),
       Question.find(periodFilter)
         .sort({ created_at: -1 })

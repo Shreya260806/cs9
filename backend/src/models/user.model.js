@@ -41,6 +41,8 @@ const userSchema = new mongoose.Schema(
     },
     status_updated_by: String,
     status_updated_at: Date,
+    // Cache field. Source of truth is spark_transactions; only spark.service.js
+    // and the spark reconciliation script may mutate this balance.
     spark_points: {
       type: Number,
       default: 0,
