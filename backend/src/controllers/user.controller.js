@@ -209,8 +209,15 @@ export async function getUserContributions(req, res, next) {
     const userId = req.params.userId
     const limit = Math.min(parseInt(req.query.limit) || 10, 50)
 
+    // Only reveal anonymous questions to the author themselves or an admin
+    const isSelfOrAdmin = req.user.userId === userId || req.user.roles.includes('ADMIN')
+    const questionFilter = { author_id: userId }
+    if (!isSelfOrAdmin) {
+      questionFilter.is_anonymous = { $ne: true }
+    }
+
     const [questions, answers, comments] = await Promise.all([
-      Question.find({ author_id: userId })
+      Question.find(questionFilter)
         .select('question_id title body status upvotes created_at')
         .sort({ created_at: -1 })
         .limit(limit)
