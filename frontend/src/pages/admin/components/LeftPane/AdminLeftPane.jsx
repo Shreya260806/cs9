@@ -15,11 +15,11 @@ function AdminLeftPane({ currentView, onNavigate }) {
         className="flex flex-col px-6 pb-6 text-left"
         onClick={() => onNavigate('dashboard')}
       >
-        <h2 className="font-display text-[13px] font-medium leading-tight text-[#8c6a40]">
-          Rogare
+        <h2 className="font-display text-[18px] font-bold leading-tight text-[#0f172a]">
+          Vicharanashala
         </h2>
-        <p className="text-[11px] font-medium uppercase tracking-widest text-[#747878]">
-          Admin Hub
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#444748]">
+          Lab Internship Hub
         </p>
       </button>
 

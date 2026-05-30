@@ -19,12 +19,12 @@ function LeftPane({ isCollapsed, onToggleCollapse, sidebarNav, currentView, onNa
         className={`flex flex-col ${isCollapsed ? 'items-center px-2' : 'px-6'} pb-6 text-left`}
         onClick={() => onNavigate('Dashboard')}
       >
-        <h2 className="font-display text-[13px] font-medium leading-tight text-[#8c6a40]">
-          Rogāre
+        <h2 className="font-display text-[18px] font-bold leading-tight text-[#0f172a]">
+          Vicharanashala
         </h2>
         {!isCollapsed && (
-          <p className="text-[11px] font-medium uppercase tracking-widest text-[#747878]">
-            Internship Hub
+          <p className="text-[10px] font-bold uppercase tracking-widest text-[#444748]">
+            Lab Internship Hub
           </p>
         )}
       </button>
