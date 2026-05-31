@@ -18,3 +18,23 @@ export async function markAllAdminNotificationsRead() {
 export async function logoutAdmin() {
   await axisPrivate().post('/api/auth/logout')
 }
+
+// ─── FAQ management ──────────────────────────────────────────────────────────
+
+export async function fetchFAQs({ limit = 100 } = {}) {
+  const { data } = await axisPrivate().get(`/api/questions?kind=faq&limit=${limit}`)
+  // Admins receive removed entries too; hide soft-deleted FAQs from the panel.
+  return (data.questions || []).filter((faq) => faq.status !== 'removed')
+}
+
+export async function updateFAQ(questionId, updates) {
+  const { data } = await axisPrivate().patch(`/api/questions/${questionId}`, updates)
+  return data.question
+}
+
+export async function deleteFAQ(questionId, reason = '') {
+  const { data } = await axisPrivate().delete(`/api/questions/${questionId}`, {
+    data: { reason },
+  })
+  return data
+}
