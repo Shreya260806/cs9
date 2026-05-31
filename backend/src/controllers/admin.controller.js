@@ -19,6 +19,10 @@ import {
   normalizeRoleName,
 } from '../services/role.service.js'
 import {
+  getPlatformSettings,
+  updatePlatformSettingsSection,
+} from '../services/platform-settings.service.js'
+import {
   createHttpError,
   getCreatedAtFilter,
   getPagination,
@@ -187,6 +191,33 @@ export async function getAdminDashboard(req, res, next) {
         })),
       },
       last24h: hourlyTraffic,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function getAdminSettings(_req, res, next) {
+  try {
+    const settings = await getPlatformSettings()
+    res.json({ success: true, settings })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function updateAdminSettings(req, res, next) {
+  try {
+    const settings = await updatePlatformSettingsSection(
+      req.params.section,
+      req.body,
+      req.user.userId,
+    )
+
+    res.json({
+      success: true,
+      message: 'Settings updated',
+      settings,
     })
   } catch (error) {
     next(error)
@@ -549,4 +580,3 @@ export async function adminCommentAndResolve(req, res, next) {
     next(error)
   }
 }
-

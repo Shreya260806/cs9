@@ -2,6 +2,7 @@ import Question from '../models/question.model.js'
 import User from '../models/user.model.js'
 import QuestionAssignmentLog from '../models/question-assignment-log.model.js'
 import Notification from '../models/notification.model.js'
+import { getPlatformSettings } from './platform-settings.service.js'
 import { getUserIdsByRole } from './role.service.js'
 import { appendFeatureLog } from '../utils/featureLogger.js'
 
@@ -43,6 +44,138 @@ async function findLeastLoadedResolver(excludeIds = []) {
   return loads[0]
 }
 
+async function getAdminEscalationCandidates({ assignmentStrategy, defaultAdminUserId }) {
+  const adminIds = await getUserIdsByRole('ADMIN')
+
+  const admins = await User.find({
+    user_id: { $in: adminIds },
+    status: 'active',
+  }).select('user_id name email').lean()
+
+  if (!admins.length) {
+    return []
+  }
+
+  if (assignmentStrategy === 'default_admin' && defaultAdminUserId) {
+    const defaultAdmin = admins.find((admin) => admin.user_id === defaultAdminUserId)
+    if (defaultAdmin) {
+      return [defaultAdmin]
+    }
+  }
+
+  const loads = await Promise.all(
+    admins.map(async admin => ({
+      ...admin,
+      load: await Question.countDocuments({
+        assigned_to: admin.user_id,
+        status: { $in: ['unanswered', 'answered'] },
+      }),
+    })),
+  )
+
+  loads.sort((a, b) => a.load - b.load || a.user_id.localeCompare(b.user_id))
+  return loads
+}
+
+async function escalateUnresolvedQuestionsToAdmin(settings) {
+  const config = settings.questionEscalation
+
+  if (!config.automaticEscalationEnabled) {
+    return { escalated: 0, skipped: 0, errors: 0 }
+  }
+
+  const adminIds = await getUserIdsByRole('ADMIN')
+  const candidates = await getAdminEscalationCandidates(config)
+
+  if (!candidates.length) {
+    await appendFeatureLog({
+      event: 'ADMIN_ESCALATION_SKIPPED',
+      reason: 'no_active_admins',
+      timestamp: new Date().toISOString(),
+    })
+    return { escalated: 0, skipped: 1, errors: 0 }
+  }
+
+  const cutoff = new Date(Date.now() - config.unresolvedHoursToEscalate * 60 * 60 * 1000)
+  const unresolvedStatuses = config.includeCommentedUnresolved
+    ? ['unanswered', 'answered']
+    : ['unanswered']
+
+  const questions = await Question.find({
+    status: { $in: unresolvedStatuses },
+    kind: 'community',
+    assigned_to: { $nin: adminIds },
+    created_at: { $lt: cutoff },
+  })
+    .sort({ created_at: 1 })
+    .lean()
+
+  let escalated = 0
+  let skipped = 0
+  let errors = 0
+
+  for (const [index, question] of questions.entries()) {
+    try {
+      const admin = config.assignmentStrategy === 'round_robin_admin'
+        ? candidates[index % candidates.length]
+        : candidates[0]
+
+      const result = await Question.updateOne(
+        { _id: question._id, assigned_to: { $nin: adminIds } },
+        { assigned_to: admin.user_id },
+      )
+
+      if (result.modifiedCount === 0) {
+        skipped++
+        continue
+      }
+
+      const queuedDurationHrs = Math.round(
+        (Date.now() - new Date(question.created_at).getTime()) / (1000 * 60 * 60),
+      )
+
+      await QuestionAssignmentLog.create({
+        question_id: question.question_id,
+        resolver_id: admin.user_id,
+        assigned_by: 'SYSTEM',
+        reason: `auto-admin-escalation-${config.unresolvedHoursToEscalate}h`,
+        assigned_at: new Date(),
+      })
+
+      await Notification.create({
+        recipient_id: admin.user_id,
+        type: 'account_status',
+        title: 'Question Escalated',
+        body: `Question "${question.title}" is unresolved after ${queuedDurationHrs} hours and has been escalated to admin review.`,
+        reference_id: question.question_id,
+        reference_type: 'question',
+        link: `/query/${question.question_id}`,
+      })
+
+      await appendFeatureLog({
+        event: 'ADMIN_ESCALATION',
+        question_id: question.question_id,
+        admin_id: admin.user_id,
+        admin_name: admin.name,
+        queued_duration_hrs: queuedDurationHrs,
+        timestamp: new Date().toISOString(),
+      })
+
+      escalated++
+    } catch (err) {
+      await appendFeatureLog({
+        event: 'ADMIN_ESCALATION_ERROR',
+        question_id: question.question_id,
+        error: err.message,
+        timestamp: new Date().toISOString(),
+      })
+      errors++
+    }
+  }
+
+  return { escalated, skipped, errors }
+}
+
 /**
  * Main allocation function.
  * Finds all unanswered community questions older than 48h with no resolver,
@@ -51,6 +184,8 @@ async function findLeastLoadedResolver(excludeIds = []) {
  * Returns a summary object for logging.
  */
 export async function allocateUnansweredQuestions() {
+  const settings = await getPlatformSettings()
+  const escalationResult = await escalateUnresolvedQuestionsToAdmin(settings)
   const cutoff = new Date(Date.now() - UNANSWERED_THRESHOLD_HOURS * 60 * 60 * 1000)
 
   const unassigned = await Question.find({
@@ -68,13 +203,18 @@ export async function allocateUnansweredQuestions() {
       count: 0,
       timestamp: new Date().toISOString(),
     })
-    return { assigned: 0, skipped: 0, errors: 0 }
+    return {
+      assigned: 0,
+      skipped: escalationResult.skipped,
+      errors: escalationResult.errors,
+      escalated: escalationResult.escalated,
+    }
   }
 
   let assigned = 0
-  let skipped = 0
-  let errors = 0
- const assignedResolverIds = new Set()
+  let skipped = escalationResult.skipped
+  let errors = escalationResult.errors
+  const assignedResolverIds = new Set()
 
   for (const question of unassigned) {
     try {
@@ -147,5 +287,5 @@ export async function allocateUnansweredQuestions() {
     }
   }
 
-  return { assigned, skipped, errors }
+  return { assigned, skipped, errors, escalated: escalationResult.escalated }
 }

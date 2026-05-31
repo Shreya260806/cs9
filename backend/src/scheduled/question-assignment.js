@@ -21,7 +21,7 @@ async function runAllocation() {
   try {
     const result = await allocateUnansweredQuestions()
     console.log(
-      `[QuestionAssignment] Done — assigned: ${result.assigned}, skipped: ${result.skipped}, errors: ${result.errors}`,
+      `[QuestionAssignment] Done — assigned: ${result.assigned}, escalated: ${result.escalated || 0}, skipped: ${result.skipped}, errors: ${result.errors}`,
     )
   } catch (err) {
     console.error('[QuestionAssignment] Unexpected error:', err.message)

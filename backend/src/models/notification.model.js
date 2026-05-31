@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema(
         'mention',
         'accepted',
         'flag_resolved',
+        'content_hidden',
         'comment',
         'reply',
         'warning',

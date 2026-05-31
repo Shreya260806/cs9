@@ -12,6 +12,7 @@ interface SelectProps {
   onChange?: (value: string) => void
   placeholder?: string
   className?: string
+  disabled?: boolean
 }
 
 function Select({
@@ -20,11 +21,12 @@ function Select({
   onChange,
   placeholder = 'Select an option',
   className = '',
+  disabled = false,
 }: SelectProps) {
   const selected = options.find((o) => o.value === value)
 
   return (
-    <Listbox value={value} onChange={onChange}>
+    <Listbox value={value} onChange={onChange} disabled={disabled}>
       <div className={`relative ${className}`}>
         {/* Trigger */}
         <ListboxButton
@@ -33,7 +35,7 @@ function Select({
               open
                 ? 'border-brand ring-1 ring-brand/15'
                 : 'border-border focus:border-text-primary focus:ring-1 focus:ring-text-primary'
-            } ${selected ? 'text-text-primary' : 'text-text-muted'}`
+            } ${selected ? 'text-text-primary' : 'text-text-muted'} disabled:cursor-not-allowed disabled:opacity-60`
           }
         >
           {({ open }: { open: boolean }) => (

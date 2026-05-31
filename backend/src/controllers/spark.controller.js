@@ -1,7 +1,11 @@
 import Answer from '../models/answer.model.js'
+import Comment from '../models/comment.model.js'
+import Notification from '../models/notification.model.js'
+import Question from '../models/question.model.js'
 import SparkTransaction from '../models/spark-transaction.model.js'
 import UserProfile from '../models/user-profile.model.js'
 import User from '../models/user.model.js'
+import { getPlatformSettings } from '../services/platform-settings.service.js'
 import { getUserIdsByRole } from '../services/role.service.js'
 import {
   createHttpError,
@@ -114,6 +118,145 @@ async function getAnswerStatsByUser(userIds) {
   )
 }
 
+function keyed(rows, mapValue) {
+  return Object.fromEntries(rows.map((row) => [row._id, mapValue(row)]))
+}
+
+async function getWeightedReputationLeaderboard({ userFilter, limit }) {
+  const settings = await getPlatformSettings()
+  const weights = settings.leaderboard
+
+  const users = await User.find(userFilter).select('user_id name spark_points').lean()
+  const userIds = users.map((user) => user.user_id)
+
+  if (!userIds.length) {
+    return []
+  }
+
+  const [
+    profiles,
+    questionRows,
+    answerRows,
+    commentRows,
+    warningRows,
+  ] = await Promise.all([
+    UserProfile.find({ user_id: { $in: userIds } }).select('user_id display_name reputation').lean(),
+    Question.aggregate([
+      {
+        $match: {
+          author_id: { $in: userIds },
+          kind: 'community',
+          status: { $ne: 'removed' },
+        },
+      },
+      {
+        $group: {
+          _id: '$author_id',
+          questionsAsked: { $sum: 1 },
+          questionUpvotes: { $sum: '$upvotes' },
+        },
+      },
+    ]),
+    Answer.aggregate([
+      {
+        $match: {
+          author_id: { $in: userIds },
+          is_deleted: { $ne: true },
+          visibility: { $ne: 'deleted' },
+        },
+      },
+      {
+        $group: {
+          _id: '$author_id',
+          answersGiven: { $sum: 1 },
+          acceptedResolutions: { $sum: { $cond: ['$is_accepted', 1, 0] } },
+          answerUpvotes: { $sum: '$upvotes' },
+          resolverActivity: {
+            $sum: {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$author_role', 'RESOLVER'] },
+                    { $eq: ['$is_expert', true] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]),
+    Comment.aggregate([
+      {
+        $match: {
+          author_id: { $in: userIds },
+          is_deleted: { $ne: true },
+          visibility: { $ne: 'deleted' },
+        },
+      },
+      {
+        $group: {
+          _id: '$author_id',
+          commentsGiven: { $sum: 1 },
+          commentUpvotes: { $sum: '$upvotes' },
+        },
+      },
+    ]),
+    Notification.aggregate([
+      {
+        $match: {
+          recipient_id: { $in: userIds },
+          type: { $in: ['warning', 'content_hidden'] },
+        },
+      },
+      { $group: { _id: '$recipient_id', negativeActions: { $sum: 1 } } },
+    ]),
+  ])
+
+  const profileById = Object.fromEntries(profiles.map((profile) => [profile.user_id, profile]))
+  const questionsById = keyed(questionRows, (row) => row)
+  const answersById = keyed(answerRows, (row) => row)
+  const commentsById = keyed(commentRows, (row) => row)
+  const warningsById = keyed(warningRows, (row) => row.negativeActions)
+
+  return users
+    .map((user) => {
+      const profile = profileById[user.user_id]
+      const questions = questionsById[user.user_id] || {}
+      const answers = answersById[user.user_id] || {}
+      const comments = commentsById[user.user_id] || {}
+      const upvotesReceived =
+        (questions.questionUpvotes || 0) +
+        (answers.answerUpvotes || 0) +
+        (comments.commentUpvotes || 0)
+      const score =
+        (questions.questionsAsked || 0) * weights.questionsAskedWeight +
+        (answers.answersGiven || 0) * weights.answersGivenWeight +
+        (comments.commentsGiven || 0) * weights.commentsGivenWeight +
+        (answers.acceptedResolutions || 0) * weights.acceptedResolutionsWeight +
+        upvotesReceived * weights.upvotesReceivedWeight +
+        (answers.resolverActivity || 0) * weights.resolverActivityWeight +
+        (user.spark_points || 0) * weights.sparkPointsWeight +
+        (profile?.reputation || 0) * weights.reputationWeight -
+        (warningsById[user.user_id] || 0) * weights.warningPenaltyWeight
+
+      return {
+        userId: user.user_id,
+        displayName: profile?.display_name || user.name,
+        score: Math.round(score * 100) / 100,
+        questionsAsked: questions.questionsAsked || 0,
+        answersCount: answers.answersGiven || 0,
+        commentsCount: comments.commentsGiven || 0,
+        acceptedResolutions: answers.acceptedResolutions || 0,
+        upvotesReceived,
+      }
+    })
+    .sort((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName))
+    .slice(0, limit)
+}
+
 export async function getLeaderboard(req, res, next) {
   try {
     const { limit } = getPagination({ page: 1, limit: req.query.limit || 20 })
@@ -177,21 +320,7 @@ export async function getLeaderboard(req, res, next) {
           score: row.score,
         }))
     } else if (type === 'reputation') {
-      const profiles = await UserProfile.find(userFilter).sort({ reputation: -1 }).limit(limit).lean()
-      const candidateUserIds = profiles.map((profile) => profile.user_id)
-      const users = await User.find({
-        user_id: { $in: candidateUserIds },
-      }).lean()
-      const byId = Object.fromEntries(users.map((user) => [user.user_id, user]))
-
-      leaderboard = profiles
-        .filter((profile) => byId[profile.user_id])
-        .slice(0, limit)
-        .map((profile) => ({
-          userId: profile.user_id,
-          displayName: profile.display_name || byId[profile.user_id].name,
-          score: profile.reputation || 0,
-        }))
+      leaderboard = await getWeightedReputationLeaderboard({ userFilter, limit })
     } else {
       // Spark points. All-time reads the cached User.spark_points balance;
       // today/monthly sum the spark ledger within the window.

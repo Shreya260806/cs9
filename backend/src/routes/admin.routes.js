@@ -6,10 +6,12 @@ import {
   createUser,
   deleteTag,
   getAdminDashboard,
+  getAdminSettings,
   listAdminSparkTransactions,
   listTags,
   removeUserRole,
   renameTag,
+  updateAdminSettings,
 } from '../controllers/admin.controller.js'
 import { checkRole, verifyToken } from '../middleware/authMiddleware.js'
 
@@ -28,6 +30,8 @@ router.use(verifyToken, checkRole('ADMIN'))
  *         description: Dashboard metrics.
  */
 router.get('/dashboard', getAdminDashboard)
+router.get('/settings', getAdminSettings)
+router.patch('/settings/:section', updateAdminSettings)
 router.post('/users/:userId/roles', assignUserRole)
 router.delete('/users/:userId/roles/:roleName', removeUserRole)
 router.post('/users', createUser)

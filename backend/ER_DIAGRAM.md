@@ -215,7 +215,7 @@ erDiagram
         string notification_id PK
         string recipient_id FK "user_id"
         string actor_id FK "user_id"
-        string type "answer|upvote|badge|mention|accepted|flag_resolved|comment|reply|warning|account_status"
+        string type "answer|upvote|badge|mention|accepted|flag_resolved|content_hidden|comment|reply|warning|account_status"
         string title
         string body
         string reference_id "polymorphic"

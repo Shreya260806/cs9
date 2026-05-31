@@ -6,6 +6,7 @@ import {
   Download,
   ShieldAlert,
   RefreshCw,
+  SlidersHorizontal,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
@@ -323,7 +324,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
         </div>
       </section>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-border-light bg-bg-card p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-text-muted">Users</p>
           <p className="mt-2 text-[22px] font-semibold text-text-primary">
@@ -346,6 +347,25 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
             {formatNumber(metrics.sparks?.total)}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => onNavigate?.('settings')}
+          className="rounded-lg border border-border-light bg-bg-card p-4 text-left transition hover:border-brand hover:shadow-md"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-text-muted">
+                Settings
+              </p>
+              <p className="mt-2 text-[13px] font-semibold text-text-primary">
+                Scoring & thresholds
+              </p>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand/10 text-brand">
+              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.8} />
+            </div>
+          </div>
+        </button>
       </div>
     </div>
   )

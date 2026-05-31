@@ -12,6 +12,7 @@ import FlagModerationView from './pages/FlagModeration'
 import SparkLeaderboardView from './pages/SparkLeaderboard'
 import UserManagementView from './pages/UserManagement'
 import AdminProfileView from './pages/AdminProfile'
+import AdminSettingsView from './pages/Settings'
 import {
   fetchAdminDashboard,
   fetchAdminNotifications,
@@ -201,6 +202,7 @@ function AdminHome() {
         {currentAdminView === 'userManagement' && <UserManagementView {...viewProps} />}
         {currentAdminView === 'sparkLeaderboard' && <SparkLeaderboardView {...viewProps} />}
         {currentAdminView === 'faqManagement' && <FAQManagementView {...viewProps} />}
+        {currentAdminView === 'settings' && <AdminSettingsView {...viewProps} />}
         {currentAdminView === 'adminProfile' && <AdminProfileView user={user} />}
       </main>
 

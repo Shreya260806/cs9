@@ -1,5 +1,5 @@
 /* global __PROJECT_NAME__, __PROJECT_TAGLINE__ */
-import { Zap, LayoutGrid, MessageSquare, PanelLeftClose, Settings, Users, Flag } from 'lucide-react'
+import { Zap, LayoutGrid, MessageSquare, PanelLeftClose, Settings, SlidersHorizontal, Users, Flag } from 'lucide-react'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutGrid },
@@ -8,6 +8,7 @@ const navItems = [
   { id: 'userManagement', label: 'Users', Icon: Users },
   { id: 'sparkLeaderboard', label: 'Spark', Icon: Zap },
   { id: 'faqManagement', label: 'FAQ', Icon: Settings },
+  { id: 'settings', label: 'Settings', Icon: SlidersHorizontal },
 ]
 
 function AdminLeftPane({ currentView, onNavigate }) {

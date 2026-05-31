@@ -22,6 +22,16 @@ export async function markAllAdminNotificationsRead() {
   return data
 }
 
+export async function fetchAdminSettings() {
+  const { data } = await axisPrivate().get('/api/admin/settings')
+  return data.settings
+}
+
+export async function updateAdminSettingsSection(section, updates) {
+  const { data } = await axisPrivate().patch(`/api/admin/settings/${section}`, updates)
+  return data.settings
+}
+
 export async function logoutAdmin() {
   await axisPrivate().post('/api/auth/logout')
 }
