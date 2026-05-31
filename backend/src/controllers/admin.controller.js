@@ -6,6 +6,7 @@ import Notification from '../models/notification.model.js'
 import Question from '../models/question.model.js'
 import Role from '../models/role.model.js'
 import SparkTransaction from '../models/spark-transaction.model.js'
+import Tag from '../models/tag.model.js'
 import UserProfile from '../models/user-profile.model.js'
 import UserRoleMapper from '../models/user-role-mapper.model.js'
 import User from '../models/user.model.js'
@@ -307,3 +308,104 @@ export async function createUser(req, res, next) {
     next(error)
   }
 }
+
+export async function listTags(req, res, next) {
+  try {
+    const { page = 1, limit = 50 } = getPagination(req)
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const [tags, total] = await Promise.all([
+      Tag.find({}).sort({ questionCount: -1, name: 1 }).skip(skip).limit(Number(limit)),
+      Tag.countDocuments({}),
+    ])
+
+    res.json({
+      success: true,
+      tags,
+      pagination: paginationResult(page, limit, total),
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function createTag(req, res, next) {
+  try {
+    const { name, description = '' } = req.body
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      throw createHttpError(400, 'Tag name is required')
+    }
+    const normalized = name.trim().toLowerCase()
+    if (normalized.length > 30) {
+      throw createHttpError(400, 'Tag name must be 30 characters or fewer')
+    }
+    const existing = await Tag.findOne({ name: normalized })
+    if (existing) {
+      throw createHttpError(409, 'Tag already exists')
+    }
+    const tag = await Tag.create({ name: normalized, description: description.trim() })
+    res.status(201).json({ success: true, tag })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function renameTag(req, res, next) {
+  try {
+    const { tagName } = req.params
+    const { name: newName } = req.body
+    if (!newName || typeof newName !== 'string' || !newName.trim()) {
+      throw createHttpError(400, 'New tag name is required')
+    }
+    const normalized = newName.trim().toLowerCase()
+    if (normalized.length > 30) {
+      throw createHttpError(400, 'Tag name must be 30 characters or fewer')
+    }
+    if (normalized === tagName) {
+      return res.json({ success: true })
+    }
+    const [oldTag, existing] = await Promise.all([
+      Tag.findOne({ name: tagName }),
+      Tag.findOne({ name: normalized }),
+    ])
+    if (!oldTag) {
+      throw createHttpError(404, 'Tag not found')
+    }
+    if (existing) {
+      throw createHttpError(409, 'A tag with that name already exists')
+    }
+    // Update all questions that have this tag
+    await Question.updateMany(
+      { tags: tagName },
+      { $set: { 'tags.$[elem]': normalized } },
+      { arrayFilters: [{ elem: tagName }] },
+    )
+    // Recompute questionCount on the tag doc
+    const newCount = await Question.countDocuments({ tags: normalized })
+    await Tag.updateOne({ name: tagName }, { name: normalized, questionCount: newCount })
+    const updated = await Tag.findOne({ name: normalized })
+    res.json({ success: true, tag: updated })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function deleteTag(req, res, next) {
+  try {
+    const { tagName } = req.params
+    const tag = await Tag.findOne({ name: tagName })
+    if (!tag) {
+      throw createHttpError(404, 'Tag not found')
+    }
+    // Remove this tag from all questions
+    await Question.updateMany(
+      { tags: tagName },
+      { $pull: { tags: tagName } },
+    )
+    await tag.deleteOne()
+    res.json({ success: true, removed: tagName })
+  } catch (error) {
+    next(error)
+  }
+}
+

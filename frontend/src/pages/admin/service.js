@@ -54,6 +54,26 @@ export async function createUser({ name, email, password, role = 'USER' }) {
   return data.user
 }
 
+export async function fetchTags() {
+  const { data } = await axisPrivate().get('/api/admin/tags')
+  return data.tags
+}
+
+export async function createTag({ name, description }) {
+  const { data } = await axisPrivate().post('/api/admin/tags', { name, description })
+  return data.tag
+}
+
+export async function renameTag(tagName, newName) {
+  const { data } = await axisPrivate().patch(`/api/admin/tags/${encodeURIComponent(tagName)}`, { name: newName })
+  return data.tag
+}
+
+export async function deleteTag(tagName) {
+  const { data } = await axisPrivate().delete(`/api/admin/tags/${encodeURIComponent(tagName)}`)
+  return data
+}
+
 // ─── Queries management ──────────────────────────────────────────────────────
 
 export async function fetchAdminQuestions({ page = 1, limit = 10, search = '' } = {}) {

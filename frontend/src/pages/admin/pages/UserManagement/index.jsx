@@ -24,6 +24,10 @@ const STATUS_STYLE = {
   suspended: 'bg-red-50 text-red-700',
 }
 
+// Shared field styling (Stitch modal redesign), mapped to our theme tokens.
+const LABEL_CLS = 'mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted transition-colors group-focus-within:text-text-primary'
+const INPUT_CLS = 'w-full rounded-lg border border-border bg-bg-primary px-4 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-text-primary focus:ring-1 focus:ring-text-primary'
+
 function initialsOf(name = '') {
   return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'U'
 }
@@ -384,52 +388,74 @@ function UserManagementView() {
       </Modal>
 
       {/* Create user modal */}
-      <Modal isOpen={!!creating} onClose={closeCreate} title="Add user" panelClassName="sm:p-8">
-        <h3 className="mb-5 text-[18px] font-bold text-text-primary">Add user</h3>
-        <form onSubmit={saveCreate} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Name</label>
-            <Input
-              value={createForm.name}
-              onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="Full name"
-            />
+      <Modal isOpen={!!creating} onClose={closeCreate} title="Add user" panelClassName="!max-w-xl !rounded-xl !p-0 overflow-hidden">
+        <form onSubmit={saveCreate}>
+          <div className="border-b border-border-light px-8 pb-6 pt-8">
+            <h2 className="font-display text-[26px] font-bold leading-tight text-text-primary">Add New User</h2>
+            <p className="mt-1 text-[13px] text-text-secondary">Create an account and assign an initial role.</p>
           </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Email</label>
-            <Input
-              type="email"
-              value={createForm.email}
-              onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
-              placeholder="user@example.com"
-            />
+
+          <div className="space-y-5 px-8 py-7">
+            <div className="group">
+              <label className={LABEL_CLS}>NAME</label>
+              <input
+                className={INPUT_CLS}
+                value={createForm.name}
+                onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g., Asha Verma"
+              />
+            </div>
+            <div className="group">
+              <label className={LABEL_CLS}>EMAIL</label>
+              <input
+                className={INPUT_CLS}
+                type="email"
+                value={createForm.email}
+                onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                placeholder="user@example.com"
+              />
+            </div>
+            <div className="group">
+              <label className={LABEL_CLS}>PASSWORD</label>
+              <input
+                className={INPUT_CLS}
+                type="password"
+                value={createForm.password}
+                onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                placeholder="Set a strong password"
+              />
+            </div>
+            <div className="group">
+              <label className={LABEL_CLS}>INITIAL ROLE</label>
+              <div className="relative flex items-center">
+                <ShieldCheck className="pointer-events-none absolute left-3 h-4 w-4 text-text-muted" strokeWidth={1.8} />
+                <select
+                  value={createForm.role}
+                  onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}
+                  className={`${INPUT_CLS} cursor-pointer appearance-none pl-10`}
+                >
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Password</label>
-            <Input
-              type="password"
-              value={createForm.password}
-              onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-              placeholder="Strong password"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Initial role</label>
-            <select
-              value={createForm.role}
-              onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}
-              className="w-full rounded-lg border border-border bg-bg-card px-4 py-2.5 text-[13px] text-text-primary shadow-sm transition focus:border-brand focus:outline-none"
+
+          <div className="flex items-center justify-end gap-3 px-8 pb-8">
+            <button
+              type="button"
+              onClick={closeCreate}
+              disabled={creatingSaving}
+              className="rounded-lg px-6 py-2.5 text-[14px] font-medium text-text-secondary transition hover:bg-hover-bg disabled:opacity-50"
             >
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeCreate} disabled={creatingSaving}>
               Cancel
-            </Button>
-            <Button type="submit" disabled={creatingSaving}>
-              {creatingSaving ? 'Creating…' : 'Create user'}
-            </Button>
+            </button>
+            <button
+              type="submit"
+              disabled={creatingSaving}
+              className="rounded-lg bg-black px-8 py-2.5 text-[14px] font-semibold text-white shadow-lg shadow-black/10 transition hover:bg-[#2e3132] disabled:opacity-50"
+            >
+              {creatingSaving ? 'Creating…' : 'Create User'}
+            </button>
           </div>
         </form>
       </Modal>

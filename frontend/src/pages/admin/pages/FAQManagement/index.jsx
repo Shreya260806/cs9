@@ -1,13 +1,86 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FileText, Pencil, Trash2, Loader, AlertTriangle, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { FileText, Pencil, Trash2, Loader, AlertTriangle, ChevronLeft, ChevronRight, Plus, Tag } from 'lucide-react'
 import Modal from '../../../../components/Modal/Modal'
 import Button from '../../../../components/Button/Button'
-import Input from '../../../../components/Input/Input'
 import { notifyError, notifySuccess } from '../../../../lib/notify'
-import { fetchFAQs, updateFAQ, deleteFAQ, createFAQ } from '../../service'
+import { fetchFAQs, updateFAQ, deleteFAQ, createFAQ, fetchTags, createTag, renameTag, deleteTag } from '../../service'
 
 const EMPTY_FORM = { title: '', body: '', tags: '' }
 const PAGE_SIZE = 10
+const EMPTY_TAG_FORM = { name: '', description: '' }
+
+// Shared field styling (Stitch "Add FAQ" redesign), mapped to our theme tokens.
+const LABEL_CLS = 'mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted transition-colors group-focus-within:text-text-primary'
+const INPUT_CLS = 'w-full rounded-lg border border-border bg-bg-primary px-4 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-text-primary focus:ring-1 focus:ring-text-primary'
+
+// Sectioned create/edit FAQ modal — header (serif title + subtitle), grouped
+// fields with focus-aware labels, leading tag icon, and a ghost/black footer.
+function FaqFormModal({ open, onClose, title, subtitle, form, setForm, onSubmit, busy, submitLabel }) {
+  return (
+    <Modal isOpen={open} onClose={onClose} title={title} panelClassName="!max-w-xl !rounded-xl !p-0 overflow-hidden">
+      <form onSubmit={onSubmit}>
+        <div className="border-b border-border-light px-8 pb-6 pt-8">
+          <h2 className="font-display text-[26px] font-bold leading-tight text-text-primary">{title}</h2>
+          <p className="mt-1 text-[13px] text-text-secondary">{subtitle}</p>
+        </div>
+
+        <div className="space-y-5 px-8 py-7">
+          <div className="group">
+            <label className={LABEL_CLS}>QUESTION</label>
+            <input
+              className={INPUT_CLS}
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g., How do I submit my weekly report?"
+            />
+          </div>
+          <div className="group">
+            <label className={LABEL_CLS}>ANSWER</label>
+            <textarea
+              className={`${INPUT_CLS} resize-none`}
+              rows={5}
+              value={form.body}
+              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              placeholder="Detail the step-by-step process or policy here…"
+            />
+          </div>
+          <div className="group">
+            <label className={LABEL_CLS}>
+              TAGS <span className="ml-0.5 text-[10px] font-medium normal-case tracking-normal text-text-muted">(comma-separated)</span>
+            </label>
+            <div className="relative flex items-center">
+              <Tag className="pointer-events-none absolute left-3 h-4 w-4 text-text-muted" strokeWidth={1.8} />
+              <input
+                className={`${INPUT_CLS} pl-10`}
+                value={form.tags}
+                onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+                placeholder="internship, onboarding, reports"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-8 pb-8">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg px-6 py-2.5 text-[14px] font-medium text-text-secondary transition hover:bg-hover-bg disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-lg bg-black px-8 py-2.5 text-[14px] font-semibold text-white shadow-lg shadow-black/10 transition hover:bg-[#2e3132] disabled:opacity-50"
+          >
+            {busy ? `${submitLabel}…` : submitLabel}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
 
 function FAQManagementView() {
   const [faqs, setFaqs]       = useState([])
@@ -23,6 +96,18 @@ function FAQManagementView() {
   const [creating, setCreating] = useState(false)
   const [createForm, setCreateForm] = useState(EMPTY_FORM)
   const [creatingSaving, setCreatingSaving] = useState(false)
+
+  const [tagPanel, setTagPanel]         = useState(false)
+  const [tags, setTags]                 = useState([])
+  const [tagsLoading, setTagsLoading]   = useState(false)
+  const [tagCreating, setTagCreating]   = useState(false)
+  const [tagForm, setTagForm]           = useState(EMPTY_TAG_FORM)
+  const [tagCreatingSaving, setTagCreatingSaving] = useState(false)
+  const [editingTag, setEditingTag]     = useState(null)   // { name, description }
+  const [editTagName, setEditTagName]   = useState('')
+  const [editTagSaving, setEditTagSaving] = useState(false)
+  const [deletingTag, setDeletingTag]   = useState(null)   // tag name pending delete
+  const [deleteTagSaving, setDeleteTagSaving] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
 
@@ -144,6 +229,19 @@ function FAQManagementView() {
           <Plus className="h-3 w-3" strokeWidth={2.5} />
           Add FAQ
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTagPanel(true)
+            setTagsLoading(true)
+            fetchTags().then(setTags).catch(() => notifyError('Failed to load tags')).finally(() => setTagsLoading(false))
+          }}
+          aria-label="Tag management"
+          className="mt-1 flex shrink-0 items-center gap-1.5 rounded-lg border border-brand px-3 py-1.5 text-[10px] font-bold text-brand transition hover:bg-brand/5"
+        >
+          <Tag className="h-3 w-3" strokeWidth={2.5} />
+          Tag Management
+        </button>
       </div>
 
       <section className="rounded-lg border border-border-light bg-bg-card shadow-sm">
@@ -241,89 +339,204 @@ function FAQManagementView() {
       </section>
 
       {/* Edit modal */}
-      <Modal isOpen={!!editing} onClose={closeEdit} title="Edit FAQ" panelClassName="sm:p-8">
-        <h3 className="mb-5 text-[18px] font-bold text-text-primary">Edit FAQ</h3>
-        <form onSubmit={saveEdit} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Question</label>
-            <Input
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="FAQ question"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Answer</label>
-            <textarea
-              value={form.body}
-              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-              rows={6}
-              placeholder="FAQ answer"
-              className="w-full rounded-lg border border-border bg-bg-card px-4 py-3 text-[13px] shadow-sm outline-none transition placeholder:text-text-muted focus:border-text-primary focus:ring-1 focus:ring-text-primary"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">
-              Tags <span className="font-normal text-text-muted">(comma-separated)</span>
-            </label>
-            <Input
-              value={form.tags}
-              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-              placeholder="internship, joining"
-            />
-          </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeEdit} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save changes'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      <FaqFormModal
+        open={!!editing}
+        onClose={closeEdit}
+        title="Edit FAQ"
+        subtitle="Update this published FAQ entry."
+        form={form}
+        setForm={setForm}
+        onSubmit={saveEdit}
+        busy={saving}
+        submitLabel="Save changes"
+      />
 
       {/* Create FAQ modal */}
-      <Modal isOpen={!!creating} onClose={closeCreate} title="Add FAQ" panelClassName="sm:p-8">
-        <h3 className="mb-5 text-[18px] font-bold text-text-primary">Add FAQ</h3>
-        <form onSubmit={saveCreate} className="flex flex-col gap-4">
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Question</label>
-            <Input
-              value={createForm.title}
-              onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="FAQ question"
+      <FaqFormModal
+        open={!!creating}
+        onClose={closeCreate}
+        title="Create New FAQ"
+        subtitle="Provide clear information for prospective interns."
+        form={createForm}
+        setForm={setCreateForm}
+        onSubmit={saveCreate}
+        busy={creatingSaving}
+        submitLabel="Create FAQ"
+      />
+
+      {/* Tag management panel */}
+      <Modal
+        isOpen={!!tagPanel}
+        onClose={() => setTagPanel(false)}
+        title="Tag Management"
+        panelClassName="!max-w-lg !rounded-xl !p-0 overflow-hidden"
+      >
+        <div className="flex flex-col gap-0">
+          {/* Create tag form */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              if (!tagForm.name.trim()) { notifyError('Tag name is required'); return }
+              setTagCreatingSaving(true)
+              try {
+                const tag = await createTag({ name: tagForm.name.trim(), description: tagForm.description.trim() })
+                setTags(prev => [{ ...tag, questionCount: 0 }, ...prev])
+                setTagForm(EMPTY_TAG_FORM)
+                notifySuccess('Tag created.')
+              } catch (err) {
+                notifyError(err?.response?.data?.message || 'Failed to create tag.')
+              } finally {
+                setTagCreatingSaving(false)
+              }
+            }}
+            className="flex gap-2 border-b border-border px-6 py-4"
+          >
+            <input
+              value={tagForm.name}
+              onChange={e => setTagForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="New tag name…"
+              maxLength={30}
+              className="flex-1 rounded-lg border border-border bg-bg-primary px-3 py-2 text-[13px] text-text-primary outline-none transition focus:border-brand"
             />
+            <button
+              type="submit"
+              disabled={tagCreatingSaving}
+              className="shrink-0 rounded-lg bg-brand px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-brand/90 disabled:opacity-50"
+            >
+              {tagCreatingSaving ? '…' : 'Add'}
+            </button>
+          </form>
+
+          {/* Tag list */}
+          <div className="max-h-72 overflow-y-auto px-6 py-3">
+            {tagsLoading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-text-muted">
+                <Loader className="h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : tags.length === 0 ? (
+              <p className="py-6 text-center text-[13px] text-text-muted">No tags yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {tags.map(tag => (
+                  <li key={tag.name} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition hover:bg-bg-primary">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-[13px] font-semibold capitalize text-text-primary truncate">
+                        {tag.name}
+                      </span>
+                      <span className="text-[11px] text-text-muted">
+                        {tag.questionCount} question{tag.questionCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                      {editingTag === tag.name ? (
+                        <form
+                          onSubmit={async (e) => {
+                            e.preventDefault()
+                            if (!editTagName.trim() || editTagName.trim() === tag.name) {
+                              setEditingTag(null); return
+                            }
+                            setEditTagSaving(true)
+                            try {
+                              await renameTag(tag.name, editTagName.trim())
+                              setTags(prev => prev.map(t =>
+                                t.name === tag.name ? { ...t, name: editTagName.trim().toLowerCase() } : t
+                              ))
+                              setEditingTag(null)
+                              notifySuccess('Tag renamed.')
+                            } catch (err) {
+                              notifyError(err?.response?.data?.message || 'Failed to rename tag.')
+                            } finally {
+                              setEditTagSaving(false)
+                            }
+                          }}
+                          className="flex gap-1"
+                        >
+                          <input
+                            value={editTagName}
+                            onChange={e => setEditTagName(e.target.value)}
+                            maxLength={30}
+                            autoFocus
+                            className="w-28 rounded-lg border border-brand bg-bg-card px-2 py-1 text-[12px] text-text-primary outline-none"
+                          />
+                          <button type="submit" disabled={editTagSaving} className="rounded-lg bg-brand px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50">
+                            {editTagSaving ? '…' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingTag(null)}
+                            className="rounded-lg border border-border px-2 py-1 text-[11px] font-medium text-text-secondary"
+                          >
+                            ✕
+                          </button>
+                        </form>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTag(tag.name)
+                              setEditTagName(tag.name)
+                            }}
+                            className="rounded-lg border border-border px-2.5 py-1 text-[11px] font-medium text-text-secondary transition hover:border-brand hover:text-brand"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingTag(tag.name)
+                            }}
+                            className="rounded-lg border border-danger/30 px-2.5 py-1 text-[11px] font-medium text-danger transition hover:bg-danger/5"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">Answer</label>
-            <textarea
-              value={createForm.body}
-              onChange={(e) => setCreateForm((f) => ({ ...f, body: e.target.value }))}
-              rows={6}
-              placeholder="FAQ answer"
-              className="w-full rounded-lg border border-border bg-bg-card px-4 py-3 text-[13px] shadow-sm outline-none transition placeholder:text-text-muted focus:border-text-primary focus:ring-1 focus:ring-text-primary"
-            />
+        </div>
+      </Modal>
+
+      {/* Delete tag confirmation */}
+      <Modal isOpen={!!deletingTag} onClose={() => setDeletingTag(null)} title="Delete Tag">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger/10">
+            <AlertTriangle className="h-6 w-6 text-danger" strokeWidth={1.8} />
           </div>
-          <div>
-            <label className="mb-1.5 block text-[12px] font-semibold text-text-secondary">
-              Tags <span className="font-normal text-text-muted">(comma-separated)</span>
-            </label>
-            <Input
-              value={createForm.tags}
-              onChange={(e) => setCreateForm((f) => ({ ...f, tags: e.target.value }))}
-              placeholder="internship, joining"
-            />
-          </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={closeCreate} disabled={creatingSaving}>
+          <h3 className="text-[18px] font-bold text-text-primary">Delete tag “{deletingTag}”?</h3>
+          <p className="mt-2 text-[13px] text-text-secondary">
+            This removes the tag from all questions that use it. Questions without tags will receive “General” on next save.
+          </p>
+          <div className="mt-6 flex w-full justify-center gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDeletingTag(null)} disabled={deleteTagSaving}>
               Cancel
             </Button>
-            <Button type="submit" disabled={creatingSaving}>
-              {creatingSaving ? 'Creating…' : 'Create FAQ'}
+            <Button
+              type="button"
+              onClick={async () => {
+                setDeleteTagSaving(true)
+                try {
+                  await deleteTag(deletingTag)
+                  setTags(prev => prev.filter(t => t.name !== deletingTag))
+                  notifySuccess('Tag deleted.')
+                  setDeletingTag(null)
+                } catch (err) {
+                  notifyError(err?.response?.data?.message || 'Failed to delete tag.')
+                } finally {
+                  setDeleteTagSaving(false)
+                }
+              }}
+              disabled={deleteTagSaving}
+              className="bg-danger hover:bg-danger/90"
+            >
+              {deleteTagSaving ? 'Deleting…' : 'Delete'}
             </Button>
           </div>
-        </form>
+        </div>
       </Modal>
 
       {/* Delete confirmation */}
