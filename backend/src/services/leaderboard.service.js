@@ -14,10 +14,17 @@ function keyed(rows, mapValue) {
  * Returns a map of userId → { questionsAsked, questionUpvotes, answersGiven,
  * acceptedResolutions, answerUpvotes, resolverActivity, commentsGiven, commentUpvotes,
  * upvotesReceived, sparkPoints, reputation, negativeActions }
+ *
+ * @param {string[]} userIds
+ * @param {Function|null} getNameByUserId - when provided (admin path), used instead of
+ *        UserProfile.display_name so admins always see real User.name values
  */
-export async function getContributorStats(userIds) {
+export async function getContributorStats(userIds, getNameByUserId = null) {
   const ids = [...new Set(userIds.filter(Boolean))]
   if (!ids.length) return {}
+
+  // Batch-fetch real names once when in admin mode (avoids N DB round-trips)
+  const nameById = getNameByUserId ? await getNameByUserId(ids) : {}
 
   const [
     profiles,
@@ -119,10 +126,14 @@ export async function getContributorStats(userIds) {
         (answers.answerUpvotes || 0) +
         (comments.commentUpvotes || 0)
 
+      const displayName = getNameByUserId
+        ? (nameById[userId] || null)
+        : (profile.display_name || null)
+
       return [
         userId,
         {
-          displayName: profile.display_name || null,
+          displayName,
           questionsAsked: questions.questionsAsked || 0,
           questionUpvotes: questions.questionUpvotes || 0,
           answersGiven: answers.answersGiven || 0,

@@ -15,7 +15,7 @@ export const routes = [
     element: <Landing />,
   },
   {
-    path: '/admin',
+    path: '/admin/*',
     element: (
       <ProtectedRoute requiredRole="ADMIN">
         <AdminHome />

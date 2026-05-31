@@ -6,6 +6,7 @@ import {
 import { fetchQuestionDetail } from '../../../user/service'
 import { adminResolveQuery } from '../../service'
 import { notifyError, notifySuccess } from '../../../../lib/notify'
+import useAuthStore from '../../../../store/useAuthStore'
 
 const STATUS_STYLE = {
   unanswered: 'bg-amber-50 text-amber-700',
@@ -127,6 +128,9 @@ function AdminQueryDetailView({ queryId, onBack }) {
   const [error, setError]     = useState(false)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const { user } = useAuthStore()
+  const userRoles = user?.roles ?? (user?.role ? [user.role] : [])
+  const isAdmin = userRoles.includes('ADMIN')
 
   const load = useCallback(async () => {
     if (!queryId) return
@@ -199,7 +203,8 @@ function AdminQueryDetailView({ queryId, onBack }) {
     else questionComments.push(c)
   }
 
-  const author = q.is_anonymous ? 'Anonymous' : (q.author_name || 'Unknown')
+  // Admins always see the real author name; anonymity only applies to students
+  const author = isAdmin ? (q.author_name || 'Unknown') : (q.is_anonymous ? 'Anonymous' : (q.author_name || 'Unknown'))
 
   return (
     <div className="flex-1 overflow-y-auto p-5 lg:p-8">
@@ -245,10 +250,10 @@ function AdminQueryDetailView({ queryId, onBack }) {
         {/* Author + stats */}
         <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border-light pt-4 text-[12px] text-text-muted">
           <span className="flex items-center gap-1.5">
-            {q.is_anonymous
-              ? <VenetianMask className="h-4 w-4" strokeWidth={1.8} />
-              : <User className="h-4 w-4" strokeWidth={1.8} />}
-            <span className={q.is_anonymous ? 'italic' : 'font-semibold text-text-secondary'}>{author}</span>
+            {isAdmin || !q.is_anonymous
+              ? <User className="h-4 w-4" strokeWidth={1.8} />
+              : <VenetianMask className="h-4 w-4" strokeWidth={1.8} />}
+            <span className={isAdmin || !q.is_anonymous ? 'font-semibold text-text-secondary' : 'italic'}>{author}</span>
           </span>
           <span className="flex items-center gap-1"><ChevronUp className="h-3.5 w-3.5" strokeWidth={1.8} /> {q.upvotes ?? 0} upvotes</span>
           <span className="flex items-center gap-1"><MessageSquare className="h-3.5 w-3.5" strokeWidth={1.8} /> {q.answer_count ?? answers.length} answers</span>

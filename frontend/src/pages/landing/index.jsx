@@ -27,7 +27,7 @@ import Button from '../../components/Button/Button'
 import labSupportImage from '../../assets/lab-support.png'
 import LoginModal from './LoginModal'
 import FaqCard from './components/FaqCard'
-import { getCurrentUser, getFaqSections } from './service'
+import { getFaqSections } from './service'
 
 const iconComponents = {
   award: Award,
@@ -73,11 +73,13 @@ function Landing() {
   const [pageProgress, setPageProgress] = useState(0)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const navigate = useNavigate()
-  const { user: currentUser, setUser } = useAuthStore()
+  const { user: currentUser, authChecked, setUser, setAuthChecked } = useAuthStore()
+  const verifiedUser = authChecked ? currentUser : null
 
   function handleLogin(user) {
     setUser(user)
-    navigate(user.role === 'ADMIN' ? '/admin' : '/dashboard')
+    setAuthChecked(true)
+    navigate(user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard')
   }
 
   function toggleFaq(accordionKey) {
@@ -118,8 +120,8 @@ function Landing() {
   }
 
   function handleHeaderButtonClick() {
-    if (currentUser) {
-      navigate(currentUser.role === 'ADMIN' ? '/admin' : '/dashboard')
+    if (verifiedUser) {
+      navigate(verifiedUser.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard')
     } else {
       if (isLoginModalOpen) {
         setIsLoginModalOpen(false)
@@ -143,33 +145,6 @@ function Landing() {
   const openKeys = new Set(firstFaqKey ? [firstFaqKey] : [])
   closedKeys.forEach((key) => openKeys.delete(key))
   explicitOpenKeys.forEach((key) => openKeys.add(key))
-
-  useEffect(() => {
-    if (currentUser) {
-      return undefined
-    }
-
-    const controller = new AbortController()
-
-    async function hydrateCurrentUser() {
-      try {
-        const user = await getCurrentUser(controller.signal)
-        setUser(user)
-      } catch (error) {
-        if (
-          error.name === 'AbortError' ||
-          error.name === 'CanceledError' ||
-          error.code === 'ERR_CANCELED'
-        ) {
-          return
-        }
-      }
-    }
-
-    hydrateCurrentUser()
-
-    return () => controller.abort()
-  }, [currentUser, setUser])
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -260,7 +235,7 @@ function Landing() {
             </span>
           </button>
           <Button variant="secondary" className="text-[10px] bg-brand/80 text-white" onClick={handleHeaderButtonClick}>
-            {currentUser ? 'Dashboard' : 'Login'}
+            {verifiedUser ? 'Dashboard' : 'Login'}
           </Button>
         </div>
       </header>
@@ -482,7 +457,7 @@ function Landing() {
             <Button
               variant="secondary"
               className="text-[10px] border-transparent bg-brand/80 text-white hover:border-transparent hover:bg-brand-hover"
-              onClick={() => currentUser ? navigate('/raise-query') : setIsLoginModalOpen(true)}
+              onClick={() => verifiedUser ? navigate('/raise-query') : setIsLoginModalOpen(true)}
             >
               Contact Crowd for Solution
             </Button>

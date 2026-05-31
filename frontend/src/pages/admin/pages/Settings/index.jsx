@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Clock3,
   Loader,
   Save,
   ShieldCheck,
   SlidersHorizontal,
   Users,
+  Eye,
+  Minus,
 } from 'lucide-react'
 import Button from '../../../../components/Button/Button'
 import Input from '../../../../components/Input/Input'
 import Select from '../../../../components/Select/Select'
+import Modal from '../../../../components/Modal/Modal'
 import { notifyError, notifySuccess } from '../../../../lib/notify'
-import { fetchAdminSettings, updateAdminSettingsSection } from '../../service'
+import { fetchAdminSettings, updateAdminSettingsSection, previewLeaderboardWeights } from '../../service'
 
 const TABS = [
   { key: 'leaderboard', label: 'Leaderboard Settings', Icon: SlidersHorizontal },
@@ -21,15 +26,15 @@ const TABS = [
 ]
 
 const LEADERBOARD_FIELDS = [
-  { path: ['questionsAskedWeight'], label: 'Questions asked weight', step: '0.1' },
-  { path: ['answersGivenWeight'], label: 'Answers given weight', step: '0.1' },
-  { path: ['commentsGivenWeight'], label: 'Comments given weight', step: '0.1' },
-  { path: ['acceptedResolutionsWeight'], label: 'Accepted resolutions weight', step: '0.1' },
-  { path: ['upvotesReceivedWeight'], label: 'Upvotes/upholds received weight', step: '0.1' },
-  { path: ['resolverActivityWeight'], label: 'Resolver activity weight', step: '0.1' },
-  { path: ['sparkPointsWeight'], label: 'Spark points weight', step: '0.1' },
-  { path: ['reputationWeight'], label: 'Reputation score weight', step: '0.1' },
-  { path: ['warningPenaltyWeight'], label: 'Warning/negative action penalty', step: '0.1' },
+  { path: ['questionsAskedWeight'], label: 'Questions asked', step: '0.1' },
+  { path: ['answersGivenWeight'], label: 'Answers given', step: '0.1' },
+  { path: ['commentsGivenWeight'], label: 'Comments given', step: '0.1' },
+  { path: ['acceptedResolutionsWeight'], label: 'Accepted resolutions', step: '0.1' },
+  { path: ['upvotesReceivedWeight'], label: 'Upvotes/upholds received', step: '0.1' },
+  { path: ['resolverActivityWeight'], label: 'Resolver activity', step: '0.1' },
+  { path: ['sparkPointsWeight'], label: 'Spark points', step: '0.1' },
+  { path: ['reputationWeight'], label: 'Reputation score', step: '0.1' },
+  { path: ['warningPenaltyWeight'], label: 'Warning/negative penalty', step: '0.1' },
 ]
 
 const RESOLVER_FIELDS = [
@@ -65,6 +70,18 @@ const STRATEGY_OPTIONS = [
   { value: 'default_admin', label: 'Default admin' },
 ]
 
+const FORMULA_COMPONENTS = [
+  { key: 'questionsAskedWeight',       label: 'Questions asked × weight' },
+  { key: 'answersGivenWeight',         label: 'Answers given × weight' },
+  { key: 'commentsGivenWeight',         label: 'Comments given × weight' },
+  { key: 'acceptedResolutionsWeight',  label: 'Accepted resolutions × weight' },
+  { key: 'upvotesReceivedWeight',      label: 'Upvotes received × weight' },
+  { key: 'resolverActivityWeight',      label: 'Resolver activity × weight' },
+  { key: 'sparkPointsWeight',           label: 'Spark points × weight' },
+  { key: 'reputationWeight',            label: 'Reputation score × weight' },
+  { key: 'warningPenaltyWeight',        label: 'Warning penalty × weight (−)' },
+]
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value || {}))
 }
@@ -80,13 +97,11 @@ function getValue(source, path) {
 function setValue(source, path, value) {
   const next = clone(source)
   let cursor = next
-
   path.slice(0, -1).forEach((key) => {
     cursor[key] = cursor[key] || {}
     cursor = cursor[key]
   })
   cursor[path[path.length - 1]] = value
-
   return next
 }
 
@@ -114,16 +129,13 @@ function validateAndBuildPayload(section, values) {
     }
 
     let cursor = payload
-    field.path.slice(0, -1).forEach((pathPart) => {
-      cursor = cursor[pathPart]
-    })
+    field.path.slice(0, -1).forEach((pathPart) => { cursor = cursor[pathPart] })
     cursor[field.path[field.path.length - 1]] = number
   }
 
   if (section === 'questionEscalation') {
     const reminder = Number(payload.reminderHoursBeforeEscalation)
     const escalation = Number(payload.unresolvedHoursToEscalate)
-
     if (Number.isFinite(reminder) && Number.isFinite(escalation) && reminder > escalation) {
       errors.reminderHoursBeforeEscalation = 'Must not exceed escalation hours'
     }
@@ -209,13 +221,141 @@ function Panel({ title, description, Icon, children }) {
   )
 }
 
-function SaveBar({ disabled, saving, onSubmit }) {
+function SaveBar({ disabled, saving, previewing, onPreview, onSubmit }) {
   return (
-    <div className="mt-5 flex justify-end">
-      <Button type="submit" onClick={onSubmit} disabled={disabled || saving} className="gap-2 text-[13px]">
+    <div className="mt-5 flex items-center justify-end gap-3">
+      {onPreview && (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onPreview}
+          disabled={disabled || saving || previewing}
+          className="gap-2 text-[13px]"
+        >
+          {previewing ? <Loader className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" strokeWidth={1.8} />}
+          Preview impact
+        </Button>
+      )}
+      <Button type="submit" onClick={onSubmit} disabled={disabled || saving || previewing} className="gap-2 text-[13px]">
         {saving ? <Loader className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" strokeWidth={1.8} />}
         Save changes
       </Button>
+    </div>
+  )
+}
+
+function RankChange({ change }) {
+  if (change === 0) {
+    return <span className="flex items-center gap-1 text-[12px] text-text-muted"><Minus className="h-3 w-3" /> —</span>
+  }
+  if (change > 0) {
+    return <span className="flex items-center gap-1 text-[12px] font-bold text-success"><ArrowUp className="h-3 w-3" /> {change}</span>
+  }
+  return <span className="flex items-center gap-1 text-[12px] font-bold text-danger"><ArrowDown className="h-3 w-3" /> {Math.abs(change)}</span>
+}
+
+function WeightDiffTag({ from, to }) {
+  const same = from === to
+  const increased = to > from
+  return (
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+      same ? 'bg-bg-tertiary text-text-muted' : increased ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+    }`}>
+      {same ? 'unchanged' : increased ? `+${(to - from).toFixed(1)}` : `${(to - from).toFixed(1)}`}
+    </span>
+  )
+}
+
+function LeaderboardPreviewModal({ isOpen, onClose, previewData, loading }) {
+  if (!isOpen) return null
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Leaderboard Preview" panelClassName="!max-w-3xl !rounded-xl !p-0 overflow-hidden">
+      {loading ? (
+        <div className="flex items-center justify-center py-16 gap-2 text-[13px] text-text-muted">
+          <Loader className="h-4 w-4 animate-spin" /> Computing projected leaderboard…
+        </div>
+      ) : previewData ? (
+        <>
+          <div className="border-b border-border-light px-7 py-5">
+            <h3 className="text-[14px] font-bold text-text-primary">Weight changes</h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Object.entries(previewData.weightDiff || {}).map(([key, { from, to }]) => {
+                const field = LEADERBOARD_FIELDS.find(f => f.path[0] === key)
+                return (
+                  <span key={key} className="flex items-center gap-1.5 rounded bg-bg-tertiary px-2 py-1 text-[11px] text-text-secondary">
+                    <span>{field?.label || key}</span>
+                    <WeightDiffTag from={from} to={to} />
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-border-light bg-bg-tertiary text-left text-[11px] font-bold uppercase tracking-wide text-text-muted">
+                  <th className="px-4 py-2.5">#</th>
+                  <th className="px-4 py-2.5">Contributor</th>
+                  <th className="px-4 py-2.5 text-right">Current score</th>
+                  <th className="px-4 py-2.5 text-right">Projected score</th>
+                  <th className="px-4 py-2.5 text-center">Rank shift</th>
+                  <th className="px-4 py-2.5 text-right">Answers</th>
+                  <th className="px-4 py-2.5 text-right">Upvotes</th>
+                  <th className="px-4 py-2.5 text-right">Reputation</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-light">
+                {(previewData.projected || []).map((entry) => (
+                  <tr key={entry.userId} className="hover:bg-bg-tertiary/50 transition">
+                    <td className="px-4 py-3 font-display font-bold text-text-muted">{entry.rank}</td>
+                    <td className="px-4 py-3 font-semibold text-text-primary">{entry.displayName}</td>
+                    <td className="px-4 py-3 text-right text-text-muted">
+                      {entry.currentScore != null ? entry.currentScore.toFixed(2) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-text-primary">
+                      {entry.score.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <RankChange change={entry.rankChange} />
+                    </td>
+                    <td className="px-4 py-3 text-right text-text-secondary">{entry.answersCount}</td>
+                    <td className="px-4 py-3 text-right text-text-secondary">{entry.upvotesReceived}</td>
+                    <td className="px-4 py-3 text-right text-text-secondary">{entry.reputation}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="border-t border-border-light px-7 py-4">
+            <p className="text-[11px] text-text-muted">
+              Showing top {previewData.projected?.length} contributors. Based on current platform data — spark balances, contributions, and reputation as of now.
+            </p>
+          </div>
+        </>
+      ) : null}
+    </Modal>
+  )
+}
+
+function FormulaCard({ weights }) {
+  return (
+    <div className="rounded-lg border border-info/30 bg-info/5 px-4 py-3">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-text-muted">Score formula</p>
+      <div className="space-y-1 text-[12px] text-text-secondary">
+        <p>Score = Σ(component × weight) − negativeActions × warningPenaltyWeight</p>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          {FORMULA_COMPONENTS.map(({ key, label }) => (
+            <span key={key} className="flex items-center gap-1">
+              <code className="rounded bg-bg-primary px-1 py-0.5 text-[11px] font-mono text-text-primary">
+                {(weights[key] ?? 0).toFixed(1)}
+              </code>
+              <span className="text-text-muted">{label.replace(' × weight', '').replace(' × weight (−)', '')}</span>
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -227,9 +367,13 @@ function AdminSettingsView() {
   const [savingSection, setSavingSection] = useState('')
   const [errors, setErrors] = useState({})
 
+  // Preview state
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewData, setPreviewData] = useState(null)
+  const [previewing, setPreviewing] = useState(false)
+
   useEffect(() => {
     let isActive = true
-
     async function loadSettings() {
       setLoading(true)
       try {
@@ -244,12 +388,8 @@ function AdminSettingsView() {
         if (isActive) setLoading(false)
       }
     }
-
     loadSettings()
-
-    return () => {
-      isActive = false
-    }
+    return () => { isActive = false }
   }, [])
 
   function updateSectionValue(section, path, value) {
@@ -264,15 +404,32 @@ function AdminSettingsView() {
     }))
   }
 
+  async function handlePreview() {
+    const { errors: nextErrors, payload } = validateAndBuildPayload('leaderboard', forms.leaderboard)
+    if (Object.keys(nextErrors).length) {
+      notifyError('Fix validation errors before previewing.')
+      return
+    }
+    setPreviewing(true)
+    setPreviewOpen(true)
+    try {
+      const result = await previewLeaderboardWeights(payload)
+      setPreviewData(result)
+    } catch (err) {
+      notifyError(err?.response?.data?.message || 'Preview failed.')
+      setPreviewOpen(false)
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
   async function saveSection(section) {
     const { errors: nextErrors, payload } = validateAndBuildPayload(section, forms[section])
     setErrors(nextErrors)
-
     if (Object.keys(nextErrors).length) {
       notifyError('Please fix the highlighted fields.')
       return
     }
-
     setSavingSection(section)
     try {
       const settings = await updateAdminSettingsSection(section, payload)
@@ -310,9 +467,7 @@ function AdminSettingsView() {
   return (
     <div className="flex-1 overflow-y-auto p-5 lg:p-8">
       <div className="mb-8">
-        <h1 className="font-display text-[24px] font-semibold leading-tight text-text-primary">
-          Settings
-        </h1>
+        <h1 className="font-display text-[24px] font-semibold leading-tight text-text-primary">Settings</h1>
         <p className="mt-2 text-[13px] leading-6 text-text-secondary">
           Configure scoring, eligibility thresholds, and unresolved question escalation.
         </p>
@@ -325,14 +480,9 @@ function AdminSettingsView() {
             <button
               key={key}
               type="button"
-              onClick={() => {
-                setActiveTab(key)
-                setErrors({})
-              }}
+              onClick={() => { setActiveTab(key); setErrors({}) }}
               className={`mb-[-1px] flex min-h-11 items-center gap-2 border-b-2 text-[13px] font-semibold transition ${
-                isActive
-                  ? 'border-brand text-brand'
-                  : 'border-transparent text-text-muted hover:text-text-secondary'
+                isActive ? 'border-brand text-brand' : 'border-transparent text-text-muted hover:text-text-secondary'
               }`}
             >
               <Icon className="h-4 w-4" strokeWidth={1.8} />
@@ -349,14 +499,23 @@ function AdminSettingsView() {
             description="The reputation leaderboard uses these weights when ranking contributors."
             Icon={SlidersHorizontal}
           >
-            <FieldGrid
-              fields={LEADERBOARD_FIELDS}
-              values={forms.leaderboard}
-              errors={errors}
-              disabled={isSaving}
-              onChange={(path, value) => updateSectionValue('leaderboard', path, value)}
+            <FormulaCard weights={forms.leaderboard} />
+            <div className="mt-5">
+              <FieldGrid
+                fields={LEADERBOARD_FIELDS}
+                values={forms.leaderboard}
+                errors={errors}
+                disabled={isSaving}
+                onChange={(path, value) => updateSectionValue('leaderboard', path, value)}
+              />
+            </div>
+            <SaveBar
+              disabled={false}
+              saving={savingSection === 'leaderboard'}
+              previewing={previewing}
+              onPreview={handlePreview}
+              onSubmit={() => saveSection('leaderboard')}
             />
-            <SaveBar disabled={false} saving={savingSection === 'leaderboard'} />
           </Panel>
         </form>
       )}
@@ -405,7 +564,7 @@ function AdminSettingsView() {
               </div>
             </Panel>
           </div>
-          <SaveBar disabled={false} saving={savingSection === 'userThresholds'} />
+          <SaveBar disabled={false} saving={savingSection === 'userThresholds'} onSubmit={() => saveSection('userThresholds')} />
         </form>
       )}
 
@@ -420,7 +579,7 @@ function AdminSettingsView() {
               Comments and replies do not count as resolution. A question is unresolved until a final resolution is marked.
             </div>
 
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+            <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
               <div>
                 <FieldGrid
                   fields={ESCALATION_FIELDS}
@@ -429,7 +588,6 @@ function AdminSettingsView() {
                   disabled={isSaving}
                   onChange={(path, value) => updateSectionValue('questionEscalation', path, value)}
                 />
-
                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                   <ToggleRow
                     label="Escalate unresolved questions automatically"
@@ -469,27 +627,28 @@ function AdminSettingsView() {
                     value={forms.questionEscalation.defaultAdminUserId || ''}
                     disabled={isSaving || forms.questionEscalation.assignmentStrategy !== 'default_admin'}
                     onChange={(event) => {
-                      setErrors((current) => {
-                        const next = { ...current }
-                        delete next.defaultAdminUserId
-                        return next
-                      })
+                      setErrors((current) => { const next = { ...current }; delete next.defaultAdminUserId; return next })
                       updateSectionValue('questionEscalation', ['defaultAdminUserId'], event.target.value)
                     }}
                     className={errors.defaultAdminUserId ? 'border-danger focus:border-danger focus:ring-danger' : ''}
                   />
                   {errors.defaultAdminUserId && (
-                    <span className="mt-1 block text-[11px] font-medium text-danger">
-                      {errors.defaultAdminUserId}
-                    </span>
+                    <span className="mt-1 block text-[11px] font-medium text-danger">{errors.defaultAdminUserId}</span>
                   )}
                 </label>
               </div>
             </div>
-            <SaveBar disabled={false} saving={savingSection === 'questionEscalation'} />
+            <SaveBar disabled={false} saving={savingSection === 'questionEscalation'} onSubmit={() => saveSection('questionEscalation')} />
           </Panel>
         </form>
       )}
+
+      <LeaderboardPreviewModal
+        isOpen={previewOpen}
+        onClose={() => { setPreviewOpen(false); setPreviewData(null) }}
+        previewData={previewData}
+        loading={previewing}
+      />
     </div>
   )
 }

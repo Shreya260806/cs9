@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../store/useAuthStore'
 import useThemeStore from '../../store/useThemeStore'
 import AdminHeader from './components/Header/AdminHeader'
@@ -14,6 +14,13 @@ import UserManagementView from './pages/UserManagement'
 import AdminProfileView from './pages/AdminProfile'
 import AdminSettingsView from './pages/Settings'
 import {
+  ADMIN_ROUTE_PATHS,
+  adminPathForQuery,
+  adminViewFromPath,
+  adminQueryIdFromPath,
+  normalizeAdminNavigationTarget,
+} from './adminRoutes'
+import {
   fetchAdminDashboard,
   fetchAdminNotifications,
   logoutAdmin,
@@ -25,17 +32,19 @@ const DashboardView = lazy(() => import('./pages/Dashboard'))
 
 function AdminHome() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, clearUser } = useAuthStore()
   const isDark = useThemeStore(s => s.isDark)
   const toggleDark = useThemeStore(s => s.toggleDark)
+  const resolvedAdminView = adminViewFromPath(location.pathname)
+  const currentAdminView = resolvedAdminView || 'dashboard'
+  const selectedQueryId = adminQueryIdFromPath(location.pathname)
 
   // Sync .dark on <body> so the token CSS variables also reach portaled content
   useLayoutEffect(() => {
     document.body.classList[isDark ? 'add' : 'remove']('dark')
   }, [isDark])
 
-  const [currentAdminView, setCurrentAdminView] = useState('dashboard')
-  const [selectedQueryId, setSelectedQueryId] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
   const [isDashboardLoading, setIsDashboardLoading] = useState(true)
   const [notifications, setNotifications] = useState([])
@@ -64,6 +73,12 @@ function AdminHome() {
       setIsDashboardLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (location.pathname === '/admin' || location.pathname === '/admin/' || !resolvedAdminView) {
+      navigate(ADMIN_ROUTE_PATHS.dashboard, { replace: true })
+    }
+  }, [location.pathname, navigate, resolvedAdminView])
 
   useEffect(() => {
     let isActive = true
@@ -119,6 +134,15 @@ function AdminHome() {
     navigate('/')
   }
 
+  const navigateAdmin = useCallback((target) => {
+    const path = normalizeAdminNavigationTarget(target)
+    if (path.startsWith('http')) {
+      window.open(path, '_blank', 'noopener,noreferrer')
+      return
+    }
+    navigate(path)
+  }, [navigate])
+
   async function handleMarkAllNotifRead() {
     try {
       await markAllAdminNotificationsRead()
@@ -138,18 +162,17 @@ function AdminHome() {
   }
 
   function handleProfileSettings() {
-    setCurrentAdminView('adminProfile')
+    navigateAdmin('adminProfile')
   }
 
   function openQuery(questionId) {
-    setSelectedQueryId(questionId)
-    setCurrentAdminView('queryDetail')
+    navigate(adminPathForQuery(questionId))
   }
 
   function handleSearchSubmit(event) {
     event.preventDefault()
     if (searchQuery.trim()) {
-      setCurrentAdminView('queriesManagement')
+      navigateAdmin('queriesManagement')
     }
   }
 
@@ -158,7 +181,7 @@ function AdminHome() {
     isLoading: isDashboardLoading,
     searchQuery,
     onRefresh: loadDashboard,
-    onNavigate: setCurrentAdminView,
+    onNavigate: navigateAdmin,
   }
 
   return (
@@ -167,7 +190,7 @@ function AdminHome() {
         isDark ? 'dark' : ''
       }`}
     >
-      <AdminLeftPane currentView={currentAdminView} onNavigate={setCurrentAdminView} />
+      <AdminLeftPane currentView={currentAdminView} onNavigate={navigateAdmin} />
 
       <main className="flex min-w-0 flex-1 flex-col">
         <AdminHeader
@@ -196,7 +219,7 @@ function AdminHome() {
         )}
         {currentAdminView === 'queriesManagement' && <QueriesManagementView {...viewProps} onOpenQuery={openQuery} />}
         {currentAdminView === 'queryDetail' && (
-          <AdminQueryDetailView queryId={selectedQueryId} onBack={() => setCurrentAdminView('queriesManagement')} />
+          <AdminQueryDetailView queryId={selectedQueryId} onBack={() => navigateAdmin('queriesManagement')} />
         )}
         {currentAdminView === 'flagModeration' && <FlagModerationView {...viewProps} />}
         {currentAdminView === 'userManagement' && <UserManagementView {...viewProps} />}
@@ -213,7 +236,7 @@ function AdminHome() {
         onMarkAllRead={handleMarkAllNotifRead}
         onNavigate={(view) => {
           handleNotifSidebarClose()
-          setCurrentAdminView(view)
+          navigateAdmin(view)
         }}
       />
     </div>

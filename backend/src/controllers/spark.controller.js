@@ -29,6 +29,19 @@ async function getDisplayNameByUserId(userIds) {
   return displayNameById
 }
 
+/**
+ * Like getDisplayNameByUserId but ignores UserProfile display_name overrides —
+ * always returns the real User.name. Used for admin-facing leaderboards so that
+ * admins always see the actual identity even when a user has set an
+ * "Anonymous" display name in their profile.
+ */
+async function getRealNameByUserId(userIds) {
+  const ids = [...new Set(userIds.filter(Boolean))]
+  if (!ids.length) return {}
+  const users = await User.find({ user_id: { $in: ids } }).select('user_id name').lean()
+  return Object.fromEntries(users.map((u) => [u.user_id, u.name || 'Unknown']))
+}
+
 export async function getSparkBalance(req, res, next) {
   try {
     const profile = await UserProfile.findOne({ user_id: req.user.userId })
@@ -95,7 +108,7 @@ async function getAnswerStatsByUser(userIds) {
   )
 }
 
-async function getWeightedReputationLeaderboard({ userFilter, limit }) {
+async function getWeightedReputationLeaderboard({ userFilter, limit, isAdmin }) {
   const settings = await getPlatformSettings()
   const weights = settings.leaderboard
 
@@ -103,7 +116,7 @@ async function getWeightedReputationLeaderboard({ userFilter, limit }) {
   const userIds = users.map((u) => u.user_id)
   if (!userIds.length) return []
 
-  const statsById = await getContributorStats(userIds)
+  const statsById = await getContributorStats(userIds, isAdmin ? getRealNameByUserId : null)
 
   // Fill sparkPoints from the User docs (not in contributor stats)
   for (const user of users) {
@@ -165,7 +178,9 @@ export async function getLeaderboard(req, res, next) {
       const candidateUserIds = rows.map((row) => row._id)
       const users = await User.find({ user_id: { $in: candidateUserIds } }).lean()
       const byId = Object.fromEntries(users.map((u) => [u.user_id, u]))
-      const displayNameById = await getDisplayNameByUserId(users.map((u) => u.user_id))
+      // Admins always see real names; regular requests respect display_name overrides
+      const nameResolver = req.isAdmin ? getRealNameByUserId : getDisplayNameByUserId
+      const displayNameById = await nameResolver(users.map((u) => u.user_id))
 
       leaderboard = rows
         .filter((row) => byId[row._id])
@@ -176,7 +191,7 @@ export async function getLeaderboard(req, res, next) {
           score: row.score,
         }))
     } else if (type === 'reputation') {
-      leaderboard = await getWeightedReputationLeaderboard({ userFilter, limit })
+      leaderboard = await getWeightedReputationLeaderboard({ userFilter, limit, isAdmin: req.isAdmin })
     } else {
       // Spark points. All-time reads the cached User.spark_points balance;
       // today/monthly sum the spark ledger within the window.
@@ -195,8 +210,10 @@ export async function getLeaderboard(req, res, next) {
       }
 
       const candidateUserIds = sparkRows.map((r) => r.userId)
+      // Admins always see real names; regular requests respect display_name overrides
+      const nameResolver = req.isAdmin ? getRealNameByUserId : getDisplayNameByUserId
       const [displayNameById, statsById] = await Promise.all([
-        getDisplayNameByUserId(candidateUserIds),
+        nameResolver(candidateUserIds),
         getAnswerStatsByUser(candidateUserIds),
       ])
 
