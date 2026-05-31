@@ -27,6 +27,10 @@ export async function createAnswer(req, res, next) {
       throw createHttpError(423, 'Question is locked')
     }
 
+    if (!req.body.body || req.body.body.trim().length < 15) {
+      throw createHttpError(400, 'Answer must be at least 15 characters')
+    }
+
     const answer = await Answer.create({
       question_id: question.question_id,
       author_id: req.user.userId,
