@@ -151,12 +151,13 @@ function UserLayout() {
               tags,
             }}
           />
+            {/* Footer — appears at the bottom of the scrolled content */}
+            <div className="mt-auto">
+              <Footer />
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Footer — full width, outside content area */}
-      <Footer />
 
       {/* Notification sidebar */}
       <NotificationSidebar
