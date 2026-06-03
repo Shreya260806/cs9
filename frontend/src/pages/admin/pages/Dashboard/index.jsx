@@ -42,7 +42,7 @@ function MetricCard({ title, value, Icon, iconClassName, trend, trendType = 'up'
           <Icon className="h-5 w-5" strokeWidth={1.8} />
         </div>
         {badge ? (
-          <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white">
+          <span className="rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white dark:bg-red-500/15 dark:text-red-300">
             {badge}
           </span>
         ) : (
@@ -130,7 +130,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
           title="Community Queries"
           value={formatNumber(questionMetrics.community)}
           Icon={ClipboardList}
-          iconClassName="bg-blue-50 text-blue-700"
+          iconClassName="bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
           trend={`${formatNumber(questionMetrics.total)} total`}
           onClick={() => onNavigate('queriesManagement')}
         />
@@ -138,7 +138,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
           title="FAQ Entries"
           value={formatNumber(questionMetrics.faq)}
           Icon={CheckCircle}
-          iconClassName="bg-amber-50 text-amber-700"
+          iconClassName="bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-200"
           trend="Published"
           onClick={() => onNavigate('faqManagement')}
         />
@@ -146,7 +146,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
           title="Answers"
           value={formatNumber(metrics.answers?.total)}
           Icon={Clock}
-          iconClassName="bg-violet-50 text-violet-700"
+          iconClassName="bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-200"
           trendType="down"
           trend="Live"
         />
@@ -154,7 +154,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
           title="Open Flags"
           value={formatNumber(flagsMetrics.open)}
           Icon={AlertCircle}
-          iconClassName="bg-red-50 text-red-600"
+          iconClassName="bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-200"
           badge={flagsMetrics.open > 0 ? 'URGENT' : 'CLEAR'}
           onClick={onNavigate ? () => onNavigate('flagModeration') : undefined}
         />
@@ -241,24 +241,24 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
                 barGap={4}
                 barCategoryGap="24%"
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
                 <XAxis
                   dataKey="category"
-                  tick={{ fontSize: 9, fontWeight: 700, fill: '#6b7280' }}
+                  tick={{ fontSize: 9, fontWeight: 700, fill: 'var(--color-text-secondary)' }}
                   tickLine={false}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  axisLine={{ stroke: 'var(--color-border-light)' }}
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: '#9ca3af' }}
+                  tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }}
                   tickLine={false}
                   axisLine={false}
                   width={36}
                   allowDecimals={false}
                 />
                 <Tooltip
-                  cursor={{ fill: '#f9fafb' }}
-                  contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                  labelStyle={{ fontWeight: 700, color: '#111827' }}
+                  cursor={{ fill: 'var(--color-bg-secondary)' }}
+                  contentStyle={{ borderRadius: 8, border: '1px solid var(--color-border-light)', fontSize: 12 }}
+                  labelStyle={{ fontWeight: 700, color: 'var(--color-text-primary)' }}
                 />
                 <Bar dataKey="new" name="New" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={20} />
                 <Bar dataKey="resolved" name="Resolved" fill="#d1d5db" radius={[4, 4, 0, 0]} maxBarSize={20} />
@@ -281,26 +281,26 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
                 data={dashboardData?.last24h || []}
                 margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" vertical={false} />
                 <XAxis
                   dataKey="hour"
-                  tick={{ fontSize: 9, fill: '#9ca3af' }}
+                  tick={{ fontSize: 9, fill: 'var(--color-text-secondary)' }}
                   tickLine={false}
-                  axisLine={{ stroke: '#e5e7eb' }}
+                  axisLine={{ stroke: 'var(--color-border-light)' }}
                   tickFormatter={val => val.split(' ')[1]?.slice(0, 5) || val}
                   interval="preserveStartEnd"
                 />
                 <YAxis
-                  tick={{ fontSize: 10, fill: '#9ca3af' }}
+                  tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }}
                   tickLine={false}
                   axisLine={false}
                   width={28}
                   allowDecimals={false}
                 />
                 <Tooltip
-                  cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }}
-                  contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                  labelStyle={{ fontWeight: 700, color: '#111827' }}
+                  cursor={{ stroke: 'var(--color-border-light)', strokeWidth: 1 }}
+                  contentStyle={{ borderRadius: 8, border: '1px solid var(--color-border-light)', fontSize: 12 }}
+                  labelStyle={{ fontWeight: 700, color: 'var(--color-text-primary)' }}
                   labelFormatter={val => val}
                 />
                 <Legend

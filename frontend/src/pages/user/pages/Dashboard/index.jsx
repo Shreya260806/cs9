@@ -4,7 +4,14 @@ import { Link as LinkIcon } from 'lucide-react'
 import QuestionCard from '../../components/QuestionCard/QuestionCard'
 import FAQCategories from '../../components/FAQCategories/FAQCategories'
 import Button from '../../../../components/Button/Button'
-import { fetchQuestions, fetchQuestionCounts, fetchUserContributions, voteQuestion, normalizeQuestion } from '../../service'
+import {
+  createDashboardEventSource,
+  fetchQuestions,
+  fetchQuestionCounts,
+  fetchUserContributions,
+  voteQuestion,
+  normalizeQuestion,
+} from '../../service'
 import { queryClient } from '../../../../lib/queryClient'
 import { notifyError } from '../../../../lib/notify'
 
@@ -84,20 +91,41 @@ function DashboardPage() {
   useEffect(() => { loadQuestions() }, [loadQuestions])
 
   // ── Load counts ────────────────────────────────────────────────────────────
-  useEffect(() => {
+  const loadCounts = useCallback(async () => {
     const my = sidebarNav === 'My Queries'
-    fetchQuestionCounts({
-      search: searchQuery,
-      tag: selectedTags.join(','),
-      my,
-    })
-      .then(data => {
-        if (data.success && data.counts) {
-          setCounts(data.counts)
-        }
+    try {
+      const data = await fetchQuestionCounts({
+        search: searchQuery,
+        tag: selectedTags.join(','),
+        my,
       })
-      .catch(() => {})
+      if (data.success && data.counts) {
+        setCounts(data.counts)
+      }
+    } catch {
+      // Counts are supporting UI; keep the current values if refresh fails.
+    }
   }, [sidebarNav, searchQuery, selectedTags])
+
+  useEffect(() => { loadCounts() }, [loadCounts])
+
+  useEffect(() => {
+    const events = createDashboardEventSource({ my: sidebarNav === 'My Queries' })
+
+    function handleQuestionVote() {
+      Promise.allSettled([
+        loadQuestions(),
+        loadCounts(),
+      ])
+    }
+
+    events.addEventListener('question-vote', handleQuestionVote)
+
+    return () => {
+      events.removeEventListener('question-vote', handleQuestionVote)
+      events.close()
+    }
+  }, [loadCounts, loadQuestions, sidebarNav])
 
   // ── Upvote ─────────────────────────────────────────────────────────────────
   async function handleUpvote(id) {

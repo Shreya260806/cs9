@@ -9,13 +9,12 @@ import { notifyError, notifySuccess } from '../../../../lib/notify'
 import { fetchUsers, assignUserRole, removeUserRole, updateUserStatus, createUser } from '../../service'
 
 const PAGE_SIZE = 10
-const ROLES = ['USER', 'RESOLVER', 'ADMIN']
+const ROLES = ['USER', 'ADMIN']
 const STATUSES = ['active', 'disabled', 'suspended']
 
 const ROLE_STYLE = {
-  USER:     'bg-gray-100 text-gray-600',
-  RESOLVER: 'bg-blue-50 text-blue-700',
-  ADMIN:    'bg-purple-50 text-purple-700',
+  USER:  'bg-gray-100 text-gray-600',
+  ADMIN: 'bg-purple-50 text-purple-700',
 }
 const STATUS_STYLE = {
   active:    'bg-emerald-50 text-emerald-700',
@@ -283,7 +282,7 @@ function UserManagementView() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {(user.roles || []).map(role => (
+                  {(user.roles || []).filter(role => ROLES.includes(role)).map(role => (
                     <span key={role} className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${ROLE_STYLE[role] || ROLE_STYLE.USER}`}>
                       {role}
                     </span>

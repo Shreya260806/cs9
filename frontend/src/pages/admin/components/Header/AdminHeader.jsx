@@ -17,7 +17,7 @@ function AdminHeader({
   onProfileSettings,
 }) {
   return (
-    <header className="sticky top-0 z-40 flex min-h-[72px] items-center justify-between border-b border-border bg-[#f8f9fa] px-5 py-4 lg:px-8 dark:bg-bg-card">
+    <header className="sticky top-0 z-40 flex min-h-[72px] items-center justify-between border-b border-border bg-bg-secondary px-5 py-4 lg:px-8 dark:bg-bg-card">
       {currentAdminView === 'dashboard' || currentAdminView === 'queriesManagement' ? (
         <form
           className="flex h-10 w-full max-w-[420px] items-center gap-2 rounded-lg bg-bg-primary px-3 text-text-muted transition focus-within:ring-1 focus-within:ring-brand"

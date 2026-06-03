@@ -93,6 +93,7 @@ function QueryDetailPage() {
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
   const [posting, setPosting] = useState(false)
+  const [resolving, setResolving] = useState(false)
   const [reportTarget, setReportTarget] = useState(null) // { type, id }
   const [reporting, setReporting] = useState(false)
   const [related, setRelated] = useState([])     // latest queries sharing tags
@@ -156,12 +157,15 @@ function QueryDetailPage() {
   }
 
   async function handleResolveToggle(resolved) {
+    setResolving(true)
     try {
       await resolveQuestion(queryId, resolved)
-      notifySuccess(resolved ? 'Question marked as solved.' : 'Question reopened.')
+      notifySuccess(resolved ? 'Question marked as resolved.' : 'Question reopened.')
       await refresh()
     } catch (err) {
       notifyError(err.response?.data?.message || 'Could not update the question.')
+    } finally {
+      setResolving(false)
     }
   }
 
@@ -276,18 +280,36 @@ function QueryDetailPage() {
                 isResolved ? (
                   <Button
                     variant="secondary"
-                    className="shrink-0 gap-2 text-[12px]"
+                    className={`shrink-0 gap-2 text-[12px] transition ${resolving ? 'cursor-not-allowed opacity-80' : ''}`}
                     onClick={() => handleResolveToggle(false)}
+                    disabled={resolving}
                   >
-                    <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.8} /> Reopen
+                    {resolving ? (
+                      <>
+                        <Loader className="h-3.5 w-3.5 animate-spin" /> Reopening...
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.8} /> Reopen
+                      </>
+                    )}
                   </Button>
                 ) : (
                   <Button
                     variant="secondary"
-                    className="shrink-0 gap-2 border-brand text-[12px] text-brand hover:border-brand hover:text-brand"
+                    className={`shrink-0 gap-2 border-brand text-[12px] text-brand hover:border-brand hover:text-brand transition ${resolving ? 'cursor-not-allowed opacity-80' : ''}`}
                     onClick={() => handleResolveToggle(true)}
+                    disabled={resolving}
                   >
-                    <CheckCircle className="h-3.5 w-3.5" strokeWidth={1.8} /> Mark as Solved
+                    {resolving ? (
+                      <>
+                        <Loader className="h-3.5 w-3.5 animate-spin" /> Resolving...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-3.5 w-3.5" strokeWidth={1.8} /> Mark as Resolved
+                      </>
+                    )}
                   </Button>
                 )
               )}

@@ -23,7 +23,7 @@ const tourSteps = [
   {
     selector: '[data-tour="raise-query-btn"]',
     title: 'Raise a New Query ✍️',
-    body: "Can't find what you need? Ask a new question here and set a Spark bounty to reward resolvers who answer it.",
+    body: "Can't find what you need? Ask a new question here and set a Spark bounty to reward anyone who answers it.",
   },
   {
     selector: '[data-tour="contributions-widget"]',
@@ -74,7 +74,7 @@ function OnboardingTour({ userId, isActive, onClose }) {
 
           const spaceBelow = window.innerHeight - r.bottom
           const spaceAbove = r.top
-          let tooltipTop = 0
+          let tooltipTop
           let tooltipLeft = r.left + r.width / 2 - 160 // Center 320px tooltip horizontally
 
           // Clamp left position to viewport boundaries

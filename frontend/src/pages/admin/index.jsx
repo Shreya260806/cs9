@@ -51,6 +51,7 @@ function AdminHome() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [notifSidebarOpen, setNotifSidebarOpen] = useState(false)
+  const [isLeftPaneCollapsed, setIsLeftPaneCollapsed] = useState(false)
 
   const initials = user?.name
     ? user.name
@@ -190,7 +191,12 @@ function AdminHome() {
         isDark ? 'dark' : ''
       }`}
     >
-      <AdminLeftPane currentView={currentAdminView} onNavigate={navigateAdmin} />
+      <AdminLeftPane
+        currentView={currentAdminView}
+        onNavigate={navigateAdmin}
+        isCollapsed={isLeftPaneCollapsed}
+        onToggleCollapse={() => setIsLeftPaneCollapsed((v) => !v)}
+      />
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminHeader

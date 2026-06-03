@@ -200,4 +200,6 @@ questionSchema.pre('save', function () {
   }
 })
 
+export { questionSchema }
 export default mongoose.model('Question', questionSchema)
+
