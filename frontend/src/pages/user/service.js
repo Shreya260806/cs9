@@ -1,5 +1,7 @@
 import { axisPrivate } from '../../api/axios'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 export function timeAgo(dateStr) {
@@ -91,6 +93,15 @@ export async function fetchQuestionCounts({
 export async function voteQuestion(questionId) {
   const { data } = await axisPrivate().post(`/api/questions/${questionId}/vote`)
   return data
+}
+
+export function createDashboardEventSource({ my = false } = {}) {
+  const params = new URLSearchParams()
+  if (my) params.set('my', '1')
+
+  return new EventSource(`${API_BASE_URL}/api/dashboard/events?${params}`, {
+    withCredentials: true,
+  })
 }
 
 export async function fetchQuestionTags() {

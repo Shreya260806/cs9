@@ -122,6 +122,10 @@ function UserLayout() {
               navigate('/leaderboard')
               return
             }
+            if (label === 'FAQ') {
+              navigate('/')
+              return
+            }
             setSidebarNav(label)
             setCurrentView('dashboard')
             queryClient.removeQueries({ queryKey: ['dashboardQuestions'] })

@@ -135,7 +135,7 @@ function Landing() {
   const { data: faqSections = emptySections, isLoading, isError, error } = useQuery({
     queryKey: ['landing-faqs'],
     queryFn: () => getFaqSections(),
-    staleTime: Infinity,
+    staleTime: 5 * 1000,
   })
 
   const sections = isError ? emptySections : faqSections
@@ -241,7 +241,7 @@ function Landing() {
       </header>
 
       <div id="top" className="mx-auto flex w-full max-w-300">
-        <aside className="sticky top-16 hidden w-62 shrink-0 flex-col self-start border-r border-border pr-3 py-6 md:flex">
+        <aside className="sticky top-16 hidden w-62 shrink-0 flex-col self-start border-r border-border pr-3 py-6 md:flex max-h-[calc(100vh-6rem)] overflow-y-auto">
           <div className="mb-4">
             <h2 className="font-display text-[14px] font-semibold leading-snug text-text-primary">
               FAQ Tags
@@ -263,6 +263,10 @@ function Landing() {
                 <a
                   href={`#${section.id}`}
                   key={section.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                   className={`flex min-h-10 items-center gap-3 px-2 py-2 text-[14px] leading-normal transition ${
                     isActive ? 'border-r-2 border-brand font-bold text-brand bg-brand/10' : 'text-text-secondary hover:bg-brand/10 hover:text-brand'
                   }`}
@@ -274,6 +278,7 @@ function Landing() {
             })}
           </nav>
         </aside>
+
 
         <main className="min-w-0 flex-1 pl-2 pr-4 py-6">
           <div className="mb-8 md:hidden">
@@ -302,6 +307,10 @@ function Landing() {
                   <a
                     href={`#${section.id}`}
                     key={section.id}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth' });
+                    }}
                     className={`flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[13px] ${
                       isActive
                         ? 'border-text-primary bg-black text-white'
@@ -313,6 +322,7 @@ function Landing() {
                   </a>
                 )
               })}
+
             </nav>
           </div>
 

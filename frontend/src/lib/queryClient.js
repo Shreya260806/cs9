@@ -3,10 +3,10 @@ import { QueryClient } from '@tanstack/react-query'
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity,        // FAQs are static — never refetch unless explicitly invalidated
+      staleTime: 5 * 1000,        // 5 seconds cache
       gcTime: 30 * 60 * 1000,    // keep unused cache for 30 min
       retry: 1,
-      refetchOnWindowFocus: false, // landing page FAQs rarely need this
+      refetchOnWindowFocus: true, // landing page FAQs rarely need this
     },
   },
 })

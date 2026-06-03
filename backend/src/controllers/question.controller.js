@@ -2,10 +2,13 @@ import Answer from '../models/answer.model.js'
 import Comment from '../models/comment.model.js'
 import Notification from '../models/notification.model.js'
 import Question from '../models/question.model.js'
+import FAQQuestion from '../models/faq.model.js'
 import { QuestionView } from '../models/question_view.model.js'
+
 import User from '../models/user.model.js'
 import UserProfile from '../models/user-profile.model.js'
 import Vote from '../models/vote.model.js'
+import { publishDomainEvent } from '../services/domain-events.service.js'
 import { awardSpark, reserveBounty } from '../services/spark.service.js'
 import {
   createHttpError,
@@ -62,13 +65,14 @@ async function getDisplayNameByUserId(userIds) {
 
 export async function listPublishedFAQs(req, res, next) {
   try {
-    const faqs = await Question.find({
+    const faqs = await FAQQuestion.find({
       kind: 'faq',
       status: 'published',
       visibility: 'public',
     })
       .sort({ is_pinned: -1, title: 1 })
       .lean()
+
 
     const groupedByTag = new Map()
 
@@ -144,9 +148,10 @@ export function getQuestionStatusFilter(status) {
 export async function buildQuestionBaseFilter(req) {
   const filter = {}
 
-  if (req.query.kind) {
-    filter.kind = req.query.kind
-  }
+  // Default to 'community' when kind is not specified. This is a breaking change
+  // from previous behaviour where unspecified kind returned all kinds. Pass ?kind=faq
+  // explicitly to include FAQs, or ?kind=community (or omit) for community questions only.
+  filter.kind = req.query.kind || 'community'
 
   if (req.query.tag) {
     // Selected categories filter over tags (comma-separated → match any)
@@ -189,13 +194,30 @@ export async function createQuestion(req, res, next) {
       throw createHttpError(400, 'Spark bounty must be a non-negative integer')
     }
 
-    question = await Question.create({
+    const extraFields = {}
+    if (isAdmin(req)) {
+      if (req.body.kind) {
+        extraFields.kind = req.body.kind
+        if (req.body.kind === 'faq') {
+          extraFields.status = req.body.status || 'published'
+          extraFields.moderation_status = 'approved'
+          extraFields.visibility = 'public'
+        }
+      }
+      if (req.body.status) {
+        extraFields.status = req.body.status
+      }
+    }
+
+    const model = (isAdmin(req) && req.body.kind === 'faq') ? FAQQuestion : Question
+    question = await model.create({
       title: req.body.title,
       body: req.body.body,
       tags: req.body.tags,
       spark_bounty: sparkBounty,
       is_anonymous: req.body.isAnonymous === true || req.body.is_anonymous === true,
       author_id: req.user.userId,
+      ...extraFields,
     })
 
     await reserveBounty(req.user.userId, sparkBounty, question.question_id)
@@ -209,12 +231,15 @@ export async function createQuestion(req, res, next) {
     res.status(201).json({
       success: true,
       questionId: question.question_id,
+      question: question,
       message: 'Question created',
     })
   } catch (error) {
     if (question && error.statusCode === 403) {
-      await Question.deleteOne({ question_id: question.question_id })
+      const model = question.kind === 'faq' ? FAQQuestion : Question
+      await model.deleteOne({ question_id: question.question_id })
     }
+
     next(error)
   }
 }
@@ -256,10 +281,12 @@ export async function listQuestions(req, res, next) {
     }
 
     const sort = req.query.sort === 'trending' ? { answer_count: -1, upvotes: -1 } : { created_at: -1 }
+    const model = filter.kind === 'faq' ? FAQQuestion : Question
     const [questions, total] = await Promise.all([
-      Question.find(filter).sort(sort).skip(skip).limit(limit).lean(),
-      Question.countDocuments(filter),
+      model.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      model.countDocuments(filter),
     ])
+
 
     const nameById = await getDisplayNameByUserId(questions.map((q) => q.author_id))
 
@@ -319,7 +346,11 @@ export async function listQuestionTags(req, res, next) {
 
 export async function getQuestionById(req, res, next) {
   try {
-    const question = await Question.findOne({ question_id: req.params.questionId })
+    let question = await Question.findOne({ question_id: req.params.questionId })
+    if (!question) {
+      question = await FAQQuestion.findOne({ question_id: req.params.questionId })
+    }
+
 
     if (
       !question ||
@@ -433,14 +464,19 @@ export async function recordQuestionView(req, res, next) {
     next(error)
   }
 }
-
 export async function updateQuestion(req, res, next) {
   try {
-    const question = await Question.findOne({ question_id: req.params.questionId })
+    let question = await Question.findOne({ question_id: req.params.questionId })
+
+    if (!question) {
+      question = await FAQQuestion.findOne({ question_id: req.params.questionId })
+    }
 
     if (!question) {
       throw createHttpError(404, 'Question not found')
     }
+
+
     if (!canManage(req, question)) {
       throw createHttpError(403, 'Forbidden')
     }
@@ -448,7 +484,11 @@ export async function updateQuestion(req, res, next) {
       throw createHttpError(409, 'Question locked or resolved')
     }
 
-    for (const field of ['title', 'body', 'tags']) {
+    const whitelistedFields = ['title', 'body', 'tags']
+    if (isAdmin(req)) {
+      whitelistedFields.push('kind', 'status', 'visibility', 'moderation_status')
+    }
+    for (const field of whitelistedFields) {
       if (req.body[field] !== undefined) {
         question[field] = req.body[field]
       }
@@ -463,11 +503,16 @@ export async function updateQuestion(req, res, next) {
 
 export async function deleteQuestion(req, res, next) {
   try {
-    const question = await Question.findOne({ question_id: req.params.questionId })
+    let question = await Question.findOne({ question_id: req.params.questionId })
+
+    if (!question) {
+      question = await FAQQuestion.findOne({ question_id: req.params.questionId })
+    }
 
     if (!question) {
       throw createHttpError(404, 'Question not found')
     }
+
     if (!canManage(req, question)) {
       throw createHttpError(403, 'Forbidden')
     }
@@ -629,6 +674,13 @@ export async function voteQuestion(req, res, next) {
       { $set: { upvotes } },
     )
 
+    publishDomainEvent('question.vote.changed', {
+      questionId: question.question_id,
+      authorId: question.author_id,
+      upvotes,
+      hasVoted: !existingVote,
+    })
+
     res.json({
       success: true,
       upvotes,
@@ -680,4 +732,3 @@ export async function getQuestionCounts(req, res, next) {
     next(error)
   }
 }
-

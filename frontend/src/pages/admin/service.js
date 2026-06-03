@@ -138,7 +138,7 @@ export async function fetchAdminQuestions({ page = 1, limit = 10, search = '', s
 
 // ─── FAQ management ──────────────────────────────────────────────────────────
 
-export async function fetchFAQs({ limit = 100 } = {}) {
+export async function fetchFAQs({ limit = 1000 } = {}) {
   const { data } = await axisPrivate().get(`/api/questions?kind=faq&limit=${limit}`)
   // Admins receive removed entries too; hide soft-deleted FAQs from the panel.
   return (data.questions || []).filter((faq) => faq.status !== 'removed')

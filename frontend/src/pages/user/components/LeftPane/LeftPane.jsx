@@ -1,8 +1,9 @@
 /* global __PROJECT_NAME__, __PROJECT_TAGLINE__ */
-import { LayoutGrid, MessageSquare, Trophy, Menu } from 'lucide-react'
+import { LayoutGrid, MessageSquare, Trophy, Menu, FileText } from 'lucide-react'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', Icon: LayoutGrid },
+  { label: 'FAQ', Icon: FileText },
   { label: 'My Queries', Icon: MessageSquare },
   { label: 'Leaderboard', Icon: Trophy },
 ]

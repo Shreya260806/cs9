@@ -10,6 +10,7 @@ import adminRoutes from './routes/admin.routes.js'
 import answerRoutes from './routes/answer.routes.js'
 import authRoutes from './routes/auth.routes.js'
 import commentRoutes from './routes/comment.routes.js'
+import dashboardRoutes from './routes/dashboard.routes.js'
 import flagRoutes from './routes/flag.routes.js'
 import leaderboardRoutes from './routes/leaderboard.routes.js'
 import moderationRoutes from './routes/moderation.routes.js'
@@ -123,6 +124,7 @@ app.use('/api/profile', profileRoutes)
 app.use('/api/questions', questionRoutes)
 app.use('/api/answers', answerRoutes)
 app.use('/api/comments', commentRoutes)
+app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/flags', flagRoutes)
 app.use('/api/notifications', notificationRoutes)
