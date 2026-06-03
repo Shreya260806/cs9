@@ -4,6 +4,7 @@ import Modal from '../../../../components/Modal/Modal'
 import Button from '../../../../components/Button/Button'
 import { notifyError, notifySuccess } from '../../../../lib/notify'
 import { fetchFAQs, updateFAQ, deleteFAQ, createFAQ, fetchTags, createTag, renameTag, deleteTag } from '../../service'
+import { parseMarkdown } from '../../../../lib/markdown'
 
 const EMPTY_FORM = { title: '', body: '', tags: '' }
 const PAGE_SIZE = 10
@@ -13,9 +14,48 @@ const EMPTY_TAG_FORM = { name: '', description: '' }
 const LABEL_CLS = 'mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted transition-colors group-focus-within:text-text-primary'
 const INPUT_CLS = 'w-full rounded-lg border border-border bg-bg-primary px-4 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-text-primary focus:ring-1 focus:ring-text-primary'
 
+// Convert HTML tags to Markdown for editing
+function htmlToMarkdown(html = '') {
+  if (!html) return ''
+  let text = html
+  // Replace list items
+  text = text.replace(/<li>\s*(.*?)\s*<\/li>/gi, '* $1\n')
+  // Replace headers
+  text = text.replace(/<h1>\s*(.*?)\s*<\/h1>/gi, '# $1\n\n')
+  text = text.replace(/<h2>\s*(.*?)\s*<\/h2>/gi, '## $1\n\n')
+  text = text.replace(/<h3>\s*(.*?)\s*<\/h3>/gi, '### $1\n\n')
+  // Replace bold/italic/code
+  text = text.replace(/<strong[^>]*>\s*(.*?)\s*<\/strong>/gi, '**$1**')
+  text = text.replace(/<b[^>]*>\s*(.*?)\s*<\/b>/gi, '**$1**')
+  text = text.replace(/<em[^>]*>\s*(.*?)\s*<\/em>/gi, '*$1*')
+  text = text.replace(/<i[^>]*>\s*(.*?)\s*<\/i>/gi, '*$1*')
+  text = text.replace(/<code[^>]*>\s*(.*?)\s*<\/code>/gi, '`$1`')
+  // Replace paragraphs and line breaks
+  text = text.replace(/<p[^>]*>/gi, '')
+  text = text.replace(/<\/p>/gi, '\n\n')
+  text = text.replace(/<br\s*\/?>/gi, '\n')
+  // Strip any other tags
+  text = text.replace(/<[^>]*>/g, '')
+  // Clean up entities
+  text = text.replace(/&nbsp;/g, ' ')
+  text = text.replace(/&amp;/g, '&')
+  text = text.replace(/&lt;/g, '<')
+  text = text.replace(/&gt;/g, '>')
+  return text.trim()
+}
+
 // Sectioned create/edit FAQ modal — header (serif title + subtitle), grouped
 // fields with focus-aware labels, leading tag icon, and a ghost/black footer.
 function FaqFormModal({ open, onClose, title, subtitle, form, setForm, onSubmit, busy, submitLabel }) {
+  const [tab, setTab] = useState('write') // 'write' | 'preview'
+
+  // Reset tab to write when opening/closing
+  useEffect(() => {
+    if (!open) {
+      setTab('write')
+    }
+  }, [open])
+
   return (
     <Modal isOpen={open} onClose={onClose} title={title} panelClassName="!max-w-xl !rounded-xl !p-0 overflow-hidden">
       <form onSubmit={onSubmit}>
@@ -35,14 +75,50 @@ function FaqFormModal({ open, onClose, title, subtitle, form, setForm, onSubmit,
             />
           </div>
           <div className="group">
-            <label className={LABEL_CLS}>ANSWER</label>
-            <textarea
-              className={`${INPUT_CLS} resize-none`}
-              rows={5}
-              value={form.body}
-              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
-              placeholder="Detail the step-by-step process or policy here…"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-bold uppercase tracking-[0.08em] text-text-muted transition-colors group-focus-within:text-text-primary">
+                ANSWER
+              </label>
+              <div className="flex border border-border-light rounded-lg overflow-hidden p-0.5 bg-bg-primary">
+                <button
+                  type="button"
+                  onClick={() => setTab('write')}
+                  className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                    tab === 'write'
+                      ? 'bg-bg-card text-brand shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('preview')}
+                  className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                    tab === 'preview'
+                      ? 'bg-bg-card text-brand shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+
+            {tab === 'write' ? (
+              <textarea
+                className={`${INPUT_CLS} resize-none`}
+                rows={6}
+                value={form.body}
+                onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+                placeholder="Detail the step-by-step process or policy here… Markdown is supported."
+              />
+            ) : (
+              <div
+                className="markdown-body min-h-[148px] w-full rounded-lg border border-border bg-bg-primary px-4 py-3 text-[13px] text-text-secondary overflow-y-auto leading-6 [&_a]:text-brand [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(form.body) || '<em class="text-text-muted">Nothing to preview</em>' }}
+              />
+            )}
           </div>
           <div className="group">
             <label className={LABEL_CLS}>
@@ -137,7 +213,7 @@ function FAQManagementView() {
     setEditing(faq)
     setForm({
       title: faq.title || '',
-      body: faq.body || '',
+      body: htmlToMarkdown(faq.body || ''),
       tags: (faq.tags || []).join(', '),
     })
   }
@@ -162,7 +238,7 @@ function FAQManagementView() {
     try {
       const created = await createFAQ({
         title: createForm.title.trim(),
-        body: createForm.body.trim(),
+        body: parseMarkdown(createForm.body.trim()),
         tags: createForm.tags.split(',').map((t) => t.trim()).filter(Boolean),
       })
       setFaqs((prev) => [created, ...prev])
@@ -185,7 +261,7 @@ function FAQManagementView() {
     try {
       const updated = await updateFAQ(editing.question_id, {
         title: form.title.trim(),
-        body: form.body.trim(),
+        body: parseMarkdown(form.body.trim()),
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
       })
       setFaqs((prev) => prev.map((f) => (f.question_id === editing.question_id ? { ...f, ...updated } : f)))
@@ -272,9 +348,9 @@ function FAQManagementView() {
               <div key={faq.question_id} className="flex items-start justify-between gap-4 px-5 py-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-semibold text-text-primary">{faq.title}</p>
-                  <p
-                    className="mt-1 line-clamp-2 text-[12px] text-text-secondary"
-                    dangerouslySetInnerHTML={{ __html: faq.body || '' }}
+                  <div
+                    className="markdown-body mt-1 line-clamp-2 text-[12px] text-text-secondary [&_p]:inline"
+                    dangerouslySetInnerHTML={{ __html: parseMarkdown(faq.body || '') }}
                   />
                   {(faq.tags || []).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">

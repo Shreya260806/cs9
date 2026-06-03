@@ -196,7 +196,7 @@ questionSchema.index(
 // Normalize body whitespace before saving.
 questionSchema.pre('save', function () {
   if (this.isModified('body')) {
-    this.body = this.body.replace(/\s+/g, ' ').trim()
+    this.body = this.body.replace(/[ \t]+/g, ' ').trim()
   }
 })
 
