@@ -21,7 +21,7 @@ const STATUS_FILTERS = [
   { value: 'rejected', label: 'Dismissed' },
 ]
 
-const TARGET_TYPES = ['question', 'answer', 'comment']
+const TARGET_TYPES = ['question', 'answer']
 
 const STATUS_META = {
   pending:  { label: 'Pending',   cls: 'bg-amber-50 text-amber-700' },
