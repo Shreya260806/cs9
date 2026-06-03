@@ -1,5 +1,5 @@
 /* global __PROJECT_NAME__, __PROJECT_TAGLINE__ */
-import { LayoutGrid, MessageSquare, Trophy, PanelLeftClose, PanelLeft, Star } from 'lucide-react'
+import { LayoutGrid, MessageSquare, Trophy, Menu } from 'lucide-react'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', Icon: LayoutGrid },
@@ -10,32 +10,33 @@ const NAV_ITEMS = [
 function LeftPane({ isCollapsed, onToggleCollapse, activeNav, onNavigate }) {
   return (
     <aside
-      className={`relative flex shrink-0 flex-col border-r border-border bg-[#f8f9fa] pt-6 transition-all duration-300 dark:bg-bg-tertiary ${
+      className={`sticky top-0 z-20 h-svh overflow-y-auto overflow-x-hidden flex shrink-0 flex-col border-r border-border bg-[#f8f9fa] pt-5 transition-all duration-300 dark:bg-bg-tertiary ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
-      {/* Brand */}
-      <button
-        type="button"
-        className={`flex flex-col ${isCollapsed ? 'items-center px-2' : 'px-6'} pb-6 text-left transition hover:opacity-80`}
-        onClick={() => onNavigate('Dashboard')}
-        title={isCollapsed ? (__PROJECT_NAME__ || 'Vicharanashala') : undefined}
-      >
-        {isCollapsed ? (
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-border bg-transparent text-text-secondary">
-            <Star className="h-4 w-4" strokeWidth={2.4} />
-          </span>
-        ) : (
-          <>
-            <h2 className="font-display text-[18px] font-bold leading-tight text-text-primary">
-              {__PROJECT_NAME__ || 'Vicharanashala'}
-            </h2>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
-              {__PROJECT_TAGLINE__ || 'Lab Internship Hub'}
-            </p>
-          </>
-        )}
-      </button>
+      <div className={`flex items-start ${isCollapsed ? 'justify-center px-2 pb-6' : 'justify-between gap-3 px-6 pb-6'}`}>
+        {/* Brand */}
+        <button
+          type="button"
+          className={`min-w-0 text-left transition hover:opacity-80 ${isCollapsed ? 'hidden' : 'block'}`}
+          onClick={() => onNavigate('Dashboard')}
+        >
+          <h2 className="font-display text-[18px] font-bold leading-tight text-text-primary">
+            {__PROJECT_NAME__ || 'Vicharanashala'}
+          </h2>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
+            {__PROJECT_TAGLINE__ || 'Lab Internship Hub'}
+          </p>
+        </button>
+        <button
+          type="button"
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={onToggleCollapse}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-light bg-bg-card text-text-secondary shadow-sm transition hover:border-brand hover:bg-brand/10 hover:text-brand"
+        >
+          <Menu className="h-4.5 w-4.5" strokeWidth={2} />
+        </button>
+      </div>
 
       {/* Section label — hidden when collapsed */}
       {!isCollapsed && (
@@ -73,21 +74,6 @@ function LeftPane({ isCollapsed, onToggleCollapse, activeNav, onNavigate }) {
           )
         })}
       </nav>
-
-      {/* Toggle button — pinned to bottom */}
-      <button
-        type="button"
-        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        onClick={onToggleCollapse}
-        className={`absolute bottom-4 flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition hover:bg-brand/10 hover:text-brand ${
-          isCollapsed ? 'left-1/2 -translate-x-1/2' : 'right-3'
-        }`}
-      >
-        {isCollapsed
-          ? <PanelLeft className="h-4 w-4" strokeWidth={1.8} />
-          : <PanelLeftClose className="h-4 w-4" strokeWidth={1.8} />
-        }
-      </button>
     </aside>
   )
 }

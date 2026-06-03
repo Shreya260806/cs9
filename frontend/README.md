@@ -33,10 +33,10 @@ See [`DESIGN.md`](./DESIGN.md) for the design system — color tokens, typograph
 
 ## Environment
 
-Create a `.env` file at the project root:
+Create a `.env` file in `frontend/`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3001/api
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
 The frontend proxies `/api` to the backend in development via `vite.config.js`.

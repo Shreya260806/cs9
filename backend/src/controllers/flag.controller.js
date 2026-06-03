@@ -63,6 +63,16 @@ export async function createFlag(req, res, next) {
       throw createHttpError(404, 'Target not found')
     }
 
+    // Cannot flag your own content
+    if (target.author_id === req.user.userId) {
+      throw createHttpError(403, 'Cannot report your own content')
+    }
+
+    // Cannot flag admin content
+    if (target.author_role === 'ADMIN') {
+      throw createHttpError(403, 'Cannot report admin content')
+    }
+
     let flag
     try {
       flag = await Flag.create({

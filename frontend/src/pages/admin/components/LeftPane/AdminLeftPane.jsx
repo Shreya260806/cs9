@@ -15,7 +15,7 @@ function AdminLeftPane({ currentView, onNavigate }) {
   const activeView = currentView === 'queryDetail' ? 'queriesManagement' : currentView
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-[#f8f9fa] pt-6 md:flex dark:bg-bg-tertiary">
+    <aside className="sticky top-0 h-svh overflow-y-auto hidden w-64 shrink-0 flex-col border-r border-border bg-[#f8f9fa] pt-6 md:flex dark:bg-bg-tertiary">
       <button
         type="button"
         className="flex flex-col px-6 pb-6 text-left transition hover:opacity-80"

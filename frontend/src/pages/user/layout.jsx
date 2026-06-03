@@ -4,6 +4,7 @@ import DashboardHeader from './components/Header/DashboardHeader'
 import LeftPane from './components/LeftPane/LeftPane'
 import Footer from '../../components/Footer/Footer'
 import NotificationSidebar from './components/NotifSidebar/NotificationSidebar'
+import OnboardingTour from './components/OnboardingTour/OnboardingTour'
 import useAuthStore from '../../store/useAuthStore'
 import useThemeStore from '../../store/useThemeStore'
 import { queryClient } from '../../lib/queryClient'
@@ -30,6 +31,7 @@ function UserLayout() {
   const [selectedTags, setSelectedTags]    = useState([])
   const [searchQuery, setSearchQuery]      = useState('')
   const [tags, setTags]                   = useState([])
+  const [isTourActive, setIsTourActive]   = useState(false)
 
   const initials = user?.name
     ? user.name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase()
@@ -57,6 +59,19 @@ function UserLayout() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    if (location.pathname !== '/dashboard') return
+    const isCompleted = localStorage.getItem(`rogare-tour-completed-${user.userId}`) === 'true'
+    if (!isCompleted) {
+      const timer = setTimeout(() => {
+        setIsTourActive(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [user?.userId, location.pathname])
+
 
   async function handleLogout() {
     try {
@@ -92,12 +107,12 @@ function UserLayout() {
 
   return (
     <div
-      className={`flex min-h-svh flex-col bg-bg-primary text-text-primary ${
+      className={`flex h-svh overflow-hidden flex-col bg-bg-primary text-text-primary ${
         isDark ? 'dark' : ''
       }`}
     >
       {/* Main row: LeftPane + content */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         <LeftPane
           isCollapsed={isLeftPaneCollapsed}
           onToggleCollapse={() => setIsLeftPaneCollapsed(v => !v)}
@@ -114,7 +129,7 @@ function UserLayout() {
           }}
         />
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col overflow-hidden">
           <DashboardHeader
             user={user}
             initials={initials}
@@ -134,10 +149,12 @@ function UserLayout() {
             onRaiseQuery={() => navigate('/raise-query')}
             onProfileSettings={() => navigate('/profile')}
             onLogout={handleLogout}
+            onStartTour={() => setIsTourActive(true)}
           />
 
-          <Outlet
-            context={{
+          <div className="flex-1 overflow-y-auto">
+            <Outlet
+              context={{
               user,
               sidebarNav,
               setSidebarNav,
@@ -150,11 +167,13 @@ function UserLayout() {
               tags,
             }}
           />
+            {/* Footer — appears at the bottom of the scrolled content */}
+            <div className="mt-auto">
+              <Footer />
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Footer — full width, outside content area */}
-      <Footer />
 
       {/* Notification sidebar */}
       <NotificationSidebar
@@ -162,6 +181,13 @@ function UserLayout() {
         onClose={() => setNotifSidebarOpen(false)}
         notifications={notifications}
         onMarkAllRead={handleMarkAllNotifRead}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        userId={user?.userId}
+        isActive={isTourActive}
+        onClose={() => setIsTourActive(false)}
       />
     </div>
   )

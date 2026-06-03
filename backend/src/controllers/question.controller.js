@@ -2,6 +2,7 @@ import Answer from '../models/answer.model.js'
 import Comment from '../models/comment.model.js'
 import Notification from '../models/notification.model.js'
 import Question from '../models/question.model.js'
+import { QuestionView } from '../models/question_view.model.js'
 import User from '../models/user.model.js'
 import UserProfile from '../models/user-profile.model.js'
 import Vote from '../models/vote.model.js'
@@ -134,6 +135,50 @@ export function getQuestionStatusFilter(status) {
   return status || undefined
 }
 
+/**
+ * Builds the shared question query filter — kind, tag, keyword search (incl.
+ * answer bodies), the `my=1` ownership scope, and the non-admin moderation gate.
+ * Callers layer on their own status / pagination / soft-delete handling. Shared
+ * by listQuestions and getQuestionCounts so the two can never drift apart.
+ */
+export async function buildQuestionBaseFilter(req) {
+  const filter = {}
+
+  if (req.query.kind) {
+    filter.kind = req.query.kind
+  }
+
+  if (req.query.tag) {
+    // Selected categories filter over tags (comma-separated → match any)
+    const tags = String(req.query.tag).split(',').map((t) => t.trim()).filter(Boolean)
+    if (tags.length) {
+      filter.tags = tags.length > 1 ? { $in: tags } : tags[0]
+    }
+  }
+
+  if (req.query.search) {
+    // Keyword search over question text (title/body) and answer text
+    const search = new RegExp(escapeRegex(String(req.query.search)), 'i')
+    const answerQuestionIds = await Answer.find({ body: search }).distinct('question_id')
+    filter.$or = [
+      { title: search },
+      { body: search },
+      { question_id: { $in: answerQuestionIds } },
+    ]
+  }
+
+  // Support ?my=1 to fetch only the current user's questions
+  if (req.query.my === '1') {
+    filter.author_id = req.user.userId
+  }
+
+  if (!isAdmin(req)) {
+    filter.moderation_status = 'approved'
+  }
+
+  return filter
+}
+
 export async function createQuestion(req, res, next) {
   let question
 
@@ -149,7 +194,7 @@ export async function createQuestion(req, res, next) {
       body: req.body.body,
       tags: req.body.tags,
       spark_bounty: sparkBounty,
-      is_anonymous: req.body.isAnonymous === true,
+      is_anonymous: req.body.isAnonymous === true || req.body.is_anonymous === true,
       author_id: req.user.userId,
     })
 
@@ -177,32 +222,11 @@ export async function createQuestion(req, res, next) {
 export async function listQuestions(req, res, next) {
   try {
     const { page, limit, skip } = getPagination(req.query)
-    const filter = {}
+    const filter = await buildQuestionBaseFilter(req)
 
-    if (req.query.kind) {
-      filter.kind = req.query.kind
-    }
-
-    if (req.query.tag) {
-      // Selected categories filter over tags (comma-separated → match any)
-      const tags = String(req.query.tag).split(',').map((t) => t.trim()).filter(Boolean)
-      if (tags.length) {
-        filter.tags = tags.length > 1 ? { $in: tags } : tags[0]
-      }
-    }
     const statusFilter = getQuestionStatusFilter(req.query.status)
     if (statusFilter) {
       filter.status = statusFilter
-    }
-    if (req.query.search) {
-      // Keyword search over question text (title/body) and answer text
-      const search = new RegExp(escapeRegex(String(req.query.search)), 'i')
-      const answerQuestionIds = await Answer.find({ body: search }).distinct('question_id')
-      filter.$or = [
-        { title: search },
-        { body: search },
-        { question_id: { $in: answerQuestionIds } },
-      ]
     }
     if (req.query.createdAfter) {
       const since = new Date(req.query.createdAfter)
@@ -211,17 +235,13 @@ export async function listQuestions(req, res, next) {
       }
     }
 
-    // Support ?my=1 to fetch only the current user's questions
-    if (req.query.my === '1') {
-      filter.author_id = req.user.userId
-    }
-
     if (req.query.id) {
       filter.question_id = req.query.id
     }
 
     if (!isAdmin(req)) {
-      filter.moderation_status = 'approved'
+      // moderation_status is applied in buildQuestionBaseFilter; resolve the
+      // soft-delete visibility against whatever status filter is in effect.
       if (filter.status === 'removed') {
         filter.status = { $exists: false }
       } else if (!filter.status) {
@@ -303,11 +323,6 @@ export async function getQuestionById(req, res, next) {
       throw createHttpError(404, 'Question not found')
     }
 
-    await Question.updateOne(
-      { question_id: question.question_id },
-      { $inc: { view_count: 1 } },
-    )
-
     const includeAnswers = req.query.includeAnswers !== 'false'
     const includeComments = req.query.includeComments !== 'false'
 
@@ -369,6 +384,45 @@ export async function getQuestionById(req, res, next) {
       answers: answers.map((a) => ({ ...decorate(a), my_vote: voteByAnswer[a.answer_id] || 0 })),
       comments: comments.map(decorate),
     })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function recordQuestionView(req, res, next) {
+  try {
+    const { questionId } = req.params
+    const { userId } = req.user
+
+    // Don't count the author's own views
+    const question = await Question.findOne({ question_id: questionId })
+    if (!question) {
+      throw createHttpError(404, 'Question not found')
+    }
+    if (question.author_id === userId) {
+      return res.json({ success: true, viewed: false, reason: 'author' })
+    }
+
+    // Upsert — only inserts if (question_id, user_id) pair doesn't exist.
+    // Second+ views match the existing row and insert nothing.
+    const result = await QuestionView.updateOne(
+      { question_id: questionId, user_id: userId },
+      { $setOnInsert: { viewed_at: new Date() } },
+      { upsert: true },
+    )
+
+    // Bump the cached count ONLY when this call actually inserted a new row —
+    // i.e. the user's first view. Repeat views match the existing row
+    // (upsertedCount === 0) and must not increment.
+    const isNewView = result.upsertedCount > 0
+    if (isNewView) {
+      await Question.updateOne(
+        { question_id: questionId },
+        { $inc: { view_count: 1 } },
+      )
+    }
+
+    res.json({ success: true, viewed: isNewView })
   } catch (error) {
     next(error)
   }
@@ -540,31 +594,84 @@ export async function voteQuestion(req, res, next) {
 
     if (existingVote) {
       await existingVote.deleteOne()
-      await Question.updateOne(
-        { question_id: questionId },
-        { $inc: { upvotes: -1 } },
-      )
     } else {
-      await Vote.create({
-        user_id: userId,
-        target_type: 'question',
-        target_id: question.question_id,
-        value: 1,
-      })
-      await Question.updateOne(
-        { question_id: questionId },
-        { $inc: { upvotes: 1 } },
-      )
+      try {
+        await Vote.create({
+          user_id: userId,
+          target_type: 'question',
+          target_id: question.question_id,
+          value: 1,
+        })
+      } catch (error) {
+        // Concurrent double-click can race past the findOne and hit the
+        // unique {user_id, target_type, target_id} index. The vote already
+        // exists, so treat it as an idempotent no-op rather than a 500.
+        if (error?.code !== 11000) throw error
+      }
     }
 
-    const updated = await Question.findOne({ question_id: questionId }).select('upvotes').lean()
+    // Recompute the cached counter from the Vote collection (the source of
+    // truth) instead of a blind $inc. This is self-healing: any prior drift
+    // is corrected on the next vote, and it works without a replica set.
+    const upvotes = await Vote.countDocuments({
+      target_type: 'question',
+      target_id: question.question_id,
+      value: 1,
+    })
+    await Question.updateOne(
+      { question_id: questionId },
+      { $set: { upvotes } },
+    )
 
     res.json({
       success: true,
-      upvotes: updated?.upvotes || 0,
+      upvotes,
       hasVoted: !existingVote,
     })
   } catch (error) {
     next(error)
   }
 }
+
+export async function getQuestionCounts(req, res, next) {
+  try {
+    const filter = await buildQuestionBaseFilter(req)
+
+    if (!isAdmin(req)) {
+      filter.status = { $ne: 'removed' }
+    }
+
+    // Each tab layers its own status / recency constraint over the shared base.
+    // Status routes through getQuestionStatusFilter so these counts stay in lock
+    // step with the list endpoint's filtering ('resolved' → 'closed', etc.).
+    const [allCount, trendingCount, recentCount, unansweredCount, resolvedCount] = await Promise.all([
+      // All Queries
+      Question.countDocuments({ ...filter }),
+      // Trending (upvotes > 0)
+      Question.countDocuments({ ...filter, upvotes: { $gt: 0 } }),
+      // Recent (created in last 24h)
+      Question.countDocuments({
+        ...filter,
+        created_at: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      }),
+      // Unanswered
+      Question.countDocuments({ ...filter, status: getQuestionStatusFilter('unanswered') }),
+      // Resolved
+      Question.countDocuments({ ...filter, status: getQuestionStatusFilter('resolved') }),
+    ])
+
+    res.json({
+      success: true,
+      counts: {
+        'All Queries': allCount,
+        'Trending': trendingCount,
+        'Recent': recentCount,
+        'Unanswered': unansweredCount,
+        'Resolved': resolvedCount,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+

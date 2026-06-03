@@ -7,6 +7,7 @@ import { fetchQuestionDetail } from '../../../user/service'
 import { adminResolveQuery } from '../../service'
 import { notifyError, notifySuccess } from '../../../../lib/notify'
 import useAuthStore from '../../../../store/useAuthStore'
+import { parseMarkdown } from '../../../../lib/markdown'
 
 const STATUS_STYLE = {
   unanswered: 'bg-amber-50 text-amber-700',
@@ -83,8 +84,8 @@ function AnswerCard({ answer, comments }) {
 
           {/* Body */}
           <div
-            className="text-[13px] leading-6 text-text-secondary [&_a]:text-brand [&_a]:underline"
-            dangerouslySetInnerHTML={{ __html: answer.body || '<em>(empty)</em>' }}
+            className="markdown-body text-[13px] leading-6 text-text-secondary [&_a]:text-brand [&_a]:underline"
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(answer.body) || '<em>(empty)</em>' }}
           />
 
           {/* References */}
@@ -110,7 +111,7 @@ function AnswerCard({ answer, comments }) {
                     <span className="ml-2 text-[10px] text-text-muted">{formatDateTime(c.created_at)}</span>
                     {cs === 'deleted' && <span className="ml-2 text-[10px] font-bold uppercase text-red-600">deleted</span>}
                     {cs === 'under_review' && <span className="ml-2 text-[10px] font-bold uppercase text-amber-600">under review</span>}
-                    <p className="mt-0.5 text-text-secondary" dangerouslySetInnerHTML={{ __html: c.body || '' }} />
+                    <p className="markdown-body mt-0.5 text-text-secondary" dangerouslySetInnerHTML={{ __html: parseMarkdown(c.body) || '' }} />
                   </div>
                 )
               })}
@@ -128,6 +129,7 @@ function AdminQueryDetailView({ queryId, onBack }) {
   const [error, setError]     = useState(false)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [commentTab, setCommentTab] = useState('write') // 'write' | 'preview'
   const { user } = useAuthStore()
   const userRoles = user?.roles ?? (user?.role ? [user.role] : [])
   const isAdmin = userRoles.includes('ADMIN')
@@ -233,8 +235,8 @@ function AdminQueryDetailView({ queryId, onBack }) {
         <h1 className="font-display text-[22px] font-bold text-text-primary">{q.title}</h1>
 
         <div
-          className="mt-3 text-[14px] leading-7 text-text-secondary [&_a]:text-brand [&_a]:underline"
-          dangerouslySetInnerHTML={{ __html: q.body || '' }}
+          className="markdown-body mt-3 text-[14px] leading-7 text-text-secondary [&_a]:text-brand [&_a]:underline"
+          dangerouslySetInnerHTML={{ __html: parseMarkdown(q.body) || '' }}
         />
 
         {(q.tags || []).length > 0 && (
@@ -278,22 +280,58 @@ function AdminQueryDetailView({ queryId, onBack }) {
       )}
 
       {/* Admin response composer — posts as ADMIN and resolves immediately */}
+      {/* Admin response composer — posts as ADMIN and resolves immediately */}
       <div className="mt-6 rounded-xl border border-border-light bg-bg-card p-5 shadow-sm">
-        <div className="mb-2 flex items-center gap-2">
-          <span className="flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700">
-            <ShieldCheck className="h-3 w-3" strokeWidth={2.4} /> Respond as ADMIN
-          </span>
-          {q.status === 'closed' && (
-            <span className="text-[11px] text-text-muted">This question is already resolved — a new response re-resolves it.</span>
-          )}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-700">
+              <ShieldCheck className="h-3 w-3" strokeWidth={2.4} /> Respond as ADMIN
+            </span>
+            {q.status === 'closed' && (
+              <span className="text-[11px] text-text-muted">This question is already resolved — a new response re-resolves it.</span>
+            )}
+          </div>
+          <div className="flex border border-border-light rounded-lg overflow-hidden p-0.5 bg-bg-primary">
+            <button
+              type="button"
+              onClick={() => setCommentTab('write')}
+              className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                commentTab === 'write'
+                  ? 'bg-bg-card text-brand shadow-sm'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Write
+            </button>
+            <button
+              type="button"
+              onClick={() => setCommentTab('preview')}
+              className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                commentTab === 'preview'
+                  ? 'bg-bg-card text-brand shadow-sm'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              Preview
+            </button>
+          </div>
         </div>
-        <textarea
-          value={comment}
-          onChange={e => setComment(e.target.value)}
-          rows={3}
-          placeholder="Write an authoritative response… Posting it resolves the question."
-          className="w-full resize-none rounded-lg border border-border bg-bg-primary px-4 py-3 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-text-primary focus:ring-1 focus:ring-text-primary"
-        />
+
+        {commentTab === 'write' ? (
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            rows={3}
+            placeholder="Write an authoritative response… Posting it resolves the question. Markdown is supported."
+            className="w-full resize-none rounded-lg border border-border bg-bg-primary px-4 py-3 text-[13px] text-text-primary placeholder:text-text-muted outline-none transition focus:border-text-primary focus:ring-1 focus:ring-text-primary"
+          />
+        ) : (
+          <div
+            className="markdown-body min-h-[82px] w-full rounded-lg border border-border bg-bg-primary px-4 py-3 text-[13px] text-text-secondary overflow-y-auto"
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(comment) || '<em class="text-text-muted">Nothing to preview</em>' }}
+          />
+        )}
+
         <div className="mt-3 flex items-center justify-between">
           <p className="text-[11px] text-text-muted">Shown as <strong className="text-text-secondary">ADMIN</strong>, not your name.</p>
           <button

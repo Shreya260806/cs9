@@ -227,11 +227,11 @@ function Landing() {
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="flex flex-col text-left transition hover:opacity-80"
           >
-            <span className="font-display text-[18px] font-bold leading-tight text-text-primary sm:text-[22px]">
-              {__PROJECT_NAME__}
+            <span className="font-display text-[18px] font-bold leading-tight text-text-primary">
+              {__PROJECT_NAME__ || 'Vicharanashala'}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">
-              {__PROJECT_TAGLINE__}
+              {__PROJECT_TAGLINE__ || 'Lab Internship Hub'}
             </span>
           </button>
           <Button variant="secondary" className="text-[10px] bg-brand/80 text-white" onClick={handleHeaderButtonClick}>

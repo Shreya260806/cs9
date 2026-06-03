@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Field, Label, Textarea, Switch } from '@headlessui/react'
-import { CheckCircle2, Lightbulb, EyeOff, Image as ImageIcon, ExternalLink, Sparkles, Send } from 'lucide-react'
+import { CheckCircle2, Lightbulb, EyeOff, Image as ImageIcon, ExternalLink, Sparkles, Send, Bold, Italic, Link, Code, List } from 'lucide-react'
 import Input from '../../../../components/Input/Input'
 import Select from '../../../../components/Select/Select'
 import { createQuestion, fetchQuestionTags } from '../../service'
 import { queryClient } from '../../../../lib/queryClient'
 import { notifyError } from '../../../../lib/notify'
+import { parseMarkdown } from '../../../../lib/markdown'
 
 const STATUS_BADGE = {
   Resolved:      'bg-success/10 text-success',
@@ -14,8 +15,31 @@ const STATUS_BADGE = {
   Active:        'bg-brand/10 text-brand',
 }
 
+const FALLBACK_CATEGORIES = [{ value: 'others', label: 'Others' }]
+
 function stripHtml(s = '') {
   return s.replace(/<[^>]*>/g, '').trim()
+}
+
+function categoryOptionsFromTags(tags = []) {
+  const options = (tags || []).map(t => ({
+    value: t.tag,
+    label: t.tag.charAt(0).toUpperCase() + t.tag.slice(1),
+  }))
+  const hasOthers = options.some(option => option.value.toLowerCase() === 'others')
+
+  return hasOthers ? options : [...options, ...FALLBACK_CATEGORIES]
+}
+
+function submitErrorMessage(err) {
+  if (err.response?.status === 401) {
+    return 'Your session has expired. Please log in again.'
+  }
+  if (!err.response) {
+    return 'Could not reach the server. Please check that the backend is running.'
+  }
+
+  return err.response?.data?.message || 'Could not submit your query.'
 }
 
 function RaiseQueryPage() {
@@ -28,6 +52,29 @@ function RaiseQueryPage() {
   const [anonymous, setAnonymous]   = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted]   = useState(false)
+  const [activeTab, setActiveTab]   = useState('write')
+
+  function insertFormat(prefix, suffix = '') {
+    const textarea = document.getElementById('query-description-textarea')
+    if (!textarea) return
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const text = textarea.value
+
+    const selectedText = text.substring(start, end)
+    const replacement = prefix + (selectedText || '') + suffix
+
+    setDescription(text.substring(0, start) + replacement + text.substring(end))
+
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(
+        start + prefix.length,
+        start + prefix.length + (selectedText || '').length
+      )
+    }, 0)
+  }
 
   // Similar queries come from the cached dashboard questions (empty until the
   // dashboard has been visited; cleared + refetched when Dashboard is reopened).
@@ -40,20 +87,13 @@ function RaiseQueryPage() {
   // Category options come from the DB tags so the query lands in the right bucket
   useEffect(() => {
     fetchQuestionTags()
-      .then(tags =>
-        setCategories([
-          ...(tags || []).map(t => ({
-            value: t.tag,
-            label: t.tag.charAt(0).toUpperCase() + t.tag.slice(1),
-          })),
-          { value: 'others', label: 'Others' },
-        ]),
-      )
-      .catch(() => setCategories([]))
+      .then(tags => setCategories(categoryOptionsFromTags(tags)))
+      .catch(() => setCategories(FALLBACK_CATEGORIES))
   }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting) return
     if (!category)                return notifyError('Please choose a category.')
     if (title.trim().length < 10) return notifyError('Title must be at least 10 characters.')
     if (!description.trim())      return notifyError('Please add a description.')
@@ -64,7 +104,7 @@ function RaiseQueryPage() {
       setSubmitted(true)
       setTimeout(() => navigate('/dashboard'), 2500)
     } catch (err) {
-      notifyError(err.response?.data?.message || 'Could not submit your query.')
+      notifyError(submitErrorMessage(err))
     } finally {
       setSubmitting(false)
     }
@@ -114,14 +154,95 @@ function RaiseQueryPage() {
           </Field>
 
           <Field className="flex flex-col">
-            <Label className="mb-2 text-[13px] font-semibold text-text-secondary">Detailed Description</Label>
-            <Textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={5}
-              placeholder="Provide as much detail as possible to help us resolve this quickly…"
-              className="w-full resize-y rounded-lg border border-border bg-bg-card px-4 py-3 text-[13px] text-text-primary shadow-sm outline-none transition placeholder:text-text-muted focus:border-text-primary focus:ring-1 focus:ring-text-primary"
-            />
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-[13px] font-semibold text-text-secondary">Detailed Description</Label>
+              <div className="flex border border-border-light rounded-lg overflow-hidden p-0.5 bg-bg-primary">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('write')}
+                  className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                    activeTab === 'write'
+                      ? 'bg-bg-card text-brand shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Write
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('preview')}
+                  className={`px-3 py-1 text-[11px] font-bold rounded transition ${
+                    activeTab === 'preview'
+                      ? 'bg-bg-card text-brand shadow-sm'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  Preview
+                </button>
+              </div>
+            </div>
+
+            {activeTab === 'write' ? (
+              <div className="relative rounded-lg border border-border bg-bg-card shadow-sm focus-within:border-text-primary focus-within:ring-1 focus-within:ring-text-primary overflow-hidden">
+                {/* Formatting Toolbar */}
+                <div className="flex items-center gap-1 border-b border-border-light bg-bg-primary px-3 py-1.5">
+                  <button
+                    type="button"
+                    title="Bold"
+                    onClick={() => insertFormat('**', '**')}
+                    className="p-1 text-text-secondary hover:text-brand hover:bg-bg-tertiary rounded transition"
+                  >
+                    <Bold className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Italic"
+                    onClick={() => insertFormat('*', '*')}
+                    className="p-1 text-text-secondary hover:text-brand hover:bg-bg-tertiary rounded transition"
+                  >
+                    <Italic className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Insert Link"
+                    onClick={() => insertFormat('[', '](url)')}
+                    className="p-1 text-text-secondary hover:text-brand hover:bg-bg-tertiary rounded transition"
+                  >
+                    <Link className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Code Block"
+                    onClick={() => insertFormat('```\n', '\n```')}
+                    className="p-1 text-text-secondary hover:text-brand hover:bg-bg-tertiary rounded transition"
+                  >
+                    <Code className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title="Bullet List"
+                    onClick={() => insertFormat('- ', '')}
+                    className="p-1 text-text-secondary hover:text-brand hover:bg-bg-tertiary rounded transition"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <Textarea
+                  id="query-description-textarea"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={6}
+                  placeholder="Provide as much detail as possible to help us resolve this quickly. Markdown is supported (e.g. bold, bullet lists, code blocks)..."
+                  className="w-full resize-y bg-transparent px-4 py-3 text-[13px] text-text-primary outline-none transition placeholder:text-text-muted"
+                />
+              </div>
+            ) : (
+              <div 
+                className="markdown-body min-h-[178px] w-full rounded-lg border border-border bg-bg-primary px-4 py-3 text-[13px] text-text-secondary overflow-y-auto"
+                dangerouslySetInnerHTML={{ __html: parseMarkdown(description) || '<em class="text-text-muted">Nothing to preview</em>' }}
+              />
+            )}
           </Field>
 
           {/* Attachments (not supported yet) */}

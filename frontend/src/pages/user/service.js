@@ -73,6 +73,21 @@ export async function fetchQuestions({
   return data
 }
 
+export async function fetchQuestionCounts({
+  search = '',
+  tag = '',
+  my = false,
+} = {}) {
+  const params = new URLSearchParams({ kind: 'community' })
+  if (search) params.set('search', search)
+  if (tag) params.set('tag', tag)
+  if (my) params.set('my', '1')
+
+  const { data } = await axisPrivate().get(`/api/questions/counts?${params}`)
+  return data
+}
+
+
 export async function voteQuestion(questionId) {
   const { data } = await axisPrivate().post(`/api/questions/${questionId}/vote`)
   return data
@@ -84,7 +99,7 @@ export async function fetchQuestionTags() {
 }
 
 export async function createQuestion({ title, body, tags = [], isAnonymous = false }) {
-  const { data } = await axisPrivate().post('/api/questions', { title, body, tags, is_anonymous: isAnonymous })
+  const { data } = await axisPrivate().post('/api/questions', { title, body, tags, isAnonymous })
   return data // { success, questionId }
 }
 
@@ -93,6 +108,11 @@ export async function createQuestion({ title, body, tags = [], isAnonymous = fal
 export async function fetchQuestionDetail(questionId) {
   const { data } = await axisPrivate().get(`/api/questions/${questionId}`)
   return data // { question, answers, comments }
+}
+
+export async function recordQuestionView(questionId) {
+  // Fire-and-forget — view tracking must never block or break the page load.
+  axisPrivate().post(`/api/questions/${questionId}/view`).catch(() => {})
 }
 
 export async function postAnswer(questionId, body) {

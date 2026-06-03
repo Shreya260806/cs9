@@ -9,9 +9,10 @@ import AnswerComments from '../../components/AnswerComments/AnswerComments'
 import Button from '../../../../components/Button/Button'
 import {
   fetchQuestionDetail, fetchQuestions, postAnswer, voteAnswer, reportContent, postComment,
-  resolveQuestion, acceptAnswer,
+  resolveQuestion, acceptAnswer, recordQuestionView,
 } from '../../service'
 import { notifySuccess, notifyError } from '../../../../lib/notify'
+import { parseMarkdown } from '../../../../lib/markdown'
 
 const STATUS_LABEL = {
   unanswered: 'Active',
@@ -41,11 +42,14 @@ function QueryDetailPage() {
   const [reportTarget, setReportTarget] = useState(null) // { type, id }
   const [reporting, setReporting] = useState(false)
   const [related, setRelated] = useState([])     // latest queries sharing tags
+  const [replyTab, setReplyTab] = useState('write') // 'write' | 'preview'
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setData(await fetchQuestionDetail(queryId))
+      const result = await fetchQuestionDetail(queryId)
+      setData(result)
+      recordQuestionView(queryId)
     } catch {
       setData(null)
     } finally {
@@ -281,6 +285,7 @@ function QueryDetailPage() {
                   onAccept={() => handleAcceptAnswer(ans.answer_id)}
                   onVoteUp={() => handleVote(ans.answer_id, 'up')}
                   onVoteDown={() => handleVote(ans.answer_id, 'down')}
+                  authorRole={ans.author_role}
                   onReport={() => setReportTarget({ type: 'answer', id: ans.answer_id })}
                 >
                   {!hidden && (
@@ -309,12 +314,39 @@ function QueryDetailPage() {
                   {initialsOf(user?.name)}
                 </div>
                 <div className="rounded-xl border border-border-light bg-bg-card p-4 shadow-sm">
-                  <textarea
-                    value={reply}
-                    onChange={e => setReply(e.target.value)}
-                    placeholder="Drop your resolution, comment, or suggestions here…"
-                    className="min-h-[80px] w-full resize-y text-[13px] leading-6 text-text-primary outline-none placeholder:text-text-muted"
-                  />
+                  <div className="mb-2 flex items-center justify-between border-b border-border-light pb-2">
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setReplyTab('write')}
+                        className={`text-[11px] font-bold pb-0.5 transition ${replyTab === 'write' ? 'border-b-2 border-brand text-brand' : 'text-text-muted hover:text-text-primary'}`}
+                      >
+                        Write
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReplyTab('preview')}
+                        className={`text-[11px] font-bold pb-0.5 transition ${replyTab === 'preview' ? 'border-b-2 border-brand text-brand' : 'text-text-muted hover:text-text-primary'}`}
+                      >
+                        Preview
+                      </button>
+                    </div>
+                  </div>
+
+                  {replyTab === 'write' ? (
+                    <textarea
+                      value={reply}
+                      onChange={e => setReply(e.target.value)}
+                      placeholder="Drop your resolution, comment, or suggestions here. Markdown is supported…"
+                      className="min-h-[80px] w-full resize-y text-[13px] leading-6 text-text-primary outline-none placeholder:text-text-muted"
+                    />
+                  ) : (
+                    <div
+                      className="markdown-body min-h-[80px] w-full text-[13px] text-text-secondary overflow-y-auto"
+                      dangerouslySetInnerHTML={{ __html: parseMarkdown(reply) || '<em class="text-text-muted">Nothing to preview</em>' }}
+                    />
+                  )}
+
                   <div className="mt-2 flex justify-end border-t border-border-light pt-4">
                     <button
                       type="button"
@@ -412,7 +444,7 @@ function QueryDetailPage() {
 
 // ── Thread item (OP or answer) ──────────────────────────────────────────────
 function ThreadItem({
-  authorName, isSelf, date, body, isOriginal, accepted, score, myVote = 0,
+  authorName, isSelf, authorRole, date, body, isOriginal, accepted, score, myVote = 0,
   moderationState = 'visible', canAccept = false, onAccept, onVoteUp, onVoteDown, onReport, children,
 }) {
   const initials = initialsOf(authorName)
@@ -456,8 +488,8 @@ function ThreadItem({
           <p className="px-5 py-5 text-[13px] italic leading-6 text-text-muted">{tombstone}</p>
         ) : (
           <div
-            className="px-5 py-5 text-[14px] leading-6 text-text-secondary"
-            dangerouslySetInnerHTML={{ __html: body }}
+            className="markdown-body px-5 py-5 text-[14px] leading-6 text-text-secondary"
+            dangerouslySetInnerHTML={{ __html: parseMarkdown(body) }}
           />
         )}
 
@@ -495,7 +527,9 @@ function ThreadItem({
                 </button>
               )}
               {isSelf ? (
-                <span className="text-[11px] italic text-text-muted">Cannot report own comment</span>
+                <span className="text-[11px] italic text-text-muted">Cannot report own reply</span>
+              ) : authorRole === 'ADMIN' ? (
+                <span className="text-[11px] italic text-text-muted">Cannot report admin</span>
               ) : (
                 <button
                   type="button"

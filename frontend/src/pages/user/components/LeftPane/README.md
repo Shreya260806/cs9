@@ -1,6 +1,6 @@
 # LeftPane
 
-Sidebar navigation panel for the student dashboard. Collapsible — when expanded `w-56`, when collapsed `w-16` showing only icons.
+Sidebar navigation panel for the student dashboard. Collapsible — when expanded `w-64`, when collapsed `w-16` showing only icons. The collapse/expand control sits at the **top** of the panel.
 
 ## Props
 
@@ -16,8 +16,8 @@ Sidebar navigation panel for the student dashboard. Collapsible — when expande
 
 | State | Width | Visible |
 |-------|-------|---------|
-| Expanded | `w-56` (224px) | Brand + "Internship Hub" subtitle + "Student portal" label + nav labels |
-| Collapsed | `w-16` (64px) | Brand text only + nav icons only |
+| Expanded | `w-64` (256px) | Brand + "Internship Hub" subtitle (left) and collapse toggle (right) + "Student portal" label + nav labels |
+| Collapsed | `w-16` (64px) | Collapse/expand toggle (centered) + nav icons only — brand text hidden |
 
 ## Nav Items
 
@@ -41,9 +41,9 @@ Inactive default: `text-[#444748]`
 ## Visual Elements
 
 - Vertical connector line between nav items (dotted `bg-[#d9dadb]`)
-- Brand section at top: "Rogāre" in `#8c6a40` + "Internship Hub" subtitle (hidden when collapsed)
+- Header row at top: brand ("Rogāre" + "Internship Hub" subtitle) on the left, collapse/expand toggle on the right. When collapsed, the brand is hidden and the toggle is centered as the only header element.
+- Collapse/expand toggle: `Menu` (hamburger) icon at the top of the panel; calls `onToggleCollapse`
 - Section label: "Student portal" (hidden when collapsed)
-- Toggle button at bottom: `PanelLeftClose` when expanded, `PanelLeft` when collapsed
 - Background: `#f8f9fa` (light gray, distinct from content area)
 
 ## Notes
@@ -52,3 +52,4 @@ Inactive default: `text-[#444748]`
 - Width transitions with `transition-all duration-300`
 - Collapse state is owned by `UserLayout`, not `LeftPane`
 - The vertical connector line uses `absolute` positioning from the nav container
+- The collapse/expand toggle lives at the top of the panel (moved from a bottom-pinned button in #53, for discoverability across student pages)

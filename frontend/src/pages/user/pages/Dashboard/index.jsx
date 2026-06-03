@@ -4,7 +4,7 @@ import { Link as LinkIcon } from 'lucide-react'
 import QuestionCard from '../../components/QuestionCard/QuestionCard'
 import FAQCategories from '../../components/FAQCategories/FAQCategories'
 import Button from '../../../../components/Button/Button'
-import { fetchQuestions, fetchUserContributions, voteQuestion, normalizeQuestion } from '../../service'
+import { fetchQuestions, fetchQuestionCounts, fetchUserContributions, voteQuestion, normalizeQuestion } from '../../service'
 import { queryClient } from '../../../../lib/queryClient'
 import { notifyError } from '../../../../lib/notify'
 
@@ -16,6 +16,13 @@ function DashboardPage() {
   const [queries, setQueries]                 = useState([])
   const [loadingQueries, setLoadingQueries]   = useState(true)
   const [activeTab, setActiveTab]             = useState('All Queries')
+  const [counts, setCounts]                   = useState({
+    'All Queries': 0,
+    'Trending': 0,
+    'Recent': 0,
+    'Unanswered': 0,
+    'Resolved': 0,
+  })
   const [contributions, setContributions]     = useState([])
   const [loadingContributions, setLoadingContributions] = useState(true)
 
@@ -76,6 +83,22 @@ function DashboardPage() {
 
   useEffect(() => { loadQuestions() }, [loadQuestions])
 
+  // ── Load counts ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const my = sidebarNav === 'My Queries'
+    fetchQuestionCounts({
+      search: searchQuery,
+      tag: selectedTags.join(','),
+      my,
+    })
+      .then(data => {
+        if (data.success && data.counts) {
+          setCounts(data.counts)
+        }
+      })
+      .catch(() => {})
+  }, [sidebarNav, searchQuery, selectedTags])
+
   // ── Upvote ─────────────────────────────────────────────────────────────────
   async function handleUpvote(id) {
     setQueries(qs =>
@@ -101,22 +124,10 @@ function DashboardPage() {
   }
 
   // ── Filtered + counts ────────────────────────────────────────────────────────
-  const filtered = queries.filter(q => {
-    if (activeTab === 'Resolved'    && q.status !== 'Resolved')                      return false
-    if (activeTab === 'Unanswered'  && !['Active', 'In Progress'].includes(q.status)) return false
-    return true
-  })
-
-  const tabCounts = {
-    'All Queries': queries.length,
-    'Trending':    queries.filter(q => q.upvotes > 0).length,
-    'Recent':      queries.length,
-    'Unanswered':  queries.filter(q => ['Active', 'In Progress'].includes(q.status)).length,
-    'Resolved':    queries.filter(q => q.status === 'Resolved').length,
-  }
+  const filtered = queries
 
   return (
-    <div className="flex gap-10 p-8">
+    <div className="flex flex-col gap-10 p-8 lg:flex-row">
       {/* ── Left column ────────────────────────────────────────────── */}
       <div className="min-w-0 flex-1">
         {sidebarNav === 'My Queries' && (
@@ -126,7 +137,7 @@ function DashboardPage() {
         {/* Tabs — hidden in My Queries */}
         {sidebarNav !== 'My Queries' && (
           <div className="mb-6 flex items-center border-b border-border pb-4">
-            <div className="flex gap-7">
+            <div data-tour="tabs-filter" className="flex gap-7">
               {['All Queries', 'Trending', 'Recent', 'Unanswered', 'Resolved'].map(tab => (
                 <button
                   key={tab}
@@ -139,11 +150,11 @@ function DashboardPage() {
                   }`}
                 >
                   {tab}
-                  {tabCounts[tab] > 0 && (
+                  {counts[tab] > 0 && (
                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                       activeTab === tab ? 'bg-brand/15 text-brand' : 'bg-bg-tertiary text-text-muted'
                     }`}>
-                      {tabCounts[tab]}
+                      {counts[tab]}
                     </span>
                   )}
                 </button>
@@ -192,7 +203,7 @@ function DashboardPage() {
         />
 
         {/* Your Contribution */}
-        <div className="rounded-xl border border-border bg-bg-card p-6">
+        <div data-tour="contributions-widget" className="rounded-xl border border-border bg-bg-card p-6">
           <div className="mb-6 flex items-center gap-3">
             <div className="rounded-md bg-brand p-1.5 text-white">
               <LinkIcon className="h-5 w-5" strokeWidth={1.8} />

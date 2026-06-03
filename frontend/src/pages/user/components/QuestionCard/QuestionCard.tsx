@@ -46,6 +46,7 @@ const QuestionCard: FC<QuestionCardProps> = ({ query, onUpvote, onClick }) => {
     >
       {/* Upvote */}
       <button
+        data-tour="upvote-btn"
         type="button"
         onClick={(e) => { e.stopPropagation(); onUpvote(query.id) }}
         className="mr-5 flex h-[60px] min-w-[60px] cursor-pointer flex-col items-center justify-center rounded-lg text-[18px] font-bold transition-all"
@@ -63,7 +64,7 @@ const QuestionCard: FC<QuestionCardProps> = ({ query, onUpvote, onClick }) => {
       </button>
 
       {/* Content — clickable via parent div */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <div className="mb-3 flex items-start justify-between gap-4">
           <div className="flex flex-wrap gap-2">
             {query.tags.map((tag, i) => (
@@ -80,8 +81,8 @@ const QuestionCard: FC<QuestionCardProps> = ({ query, onUpvote, onClick }) => {
           </span>
         </div>
 
-        <h3 className="font-display mb-2 text-[18px] font-semibold text-text-primary">{query.title}</h3>
-        <p className="mb-4 text-[13px] leading-6 text-text-secondary" dangerouslySetInnerHTML={{ __html: query.desc }} />
+        <h3 className="font-display mb-2 text-[18px] font-semibold text-text-primary break-words">{query.title}</h3>
+        <p className="mb-4 text-[13px] leading-6 text-text-secondary break-words" dangerouslySetInnerHTML={{ __html: query.desc }} />
 
         <div className="flex items-center gap-5 text-[12px] font-medium text-text-secondary">
           {/* Total replies (answer_count) */}

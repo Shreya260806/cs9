@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit'
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit'
 
 /**
  * Rate limiter: max 5 questions per 10 minutes per user.
@@ -12,7 +12,7 @@ export const questionCreationLimiter = rateLimit({
   legacyHeaders: false,
   keyGenerator: (req) => {
     // req.user is populated by verifyToken middleware (runs before this limiter)
-    return req.user?.userId || req.ip
+    return req.user?.userId || ipKeyGenerator(req, req.res)
   },
   message: {
     success: false,

@@ -206,3 +206,18 @@ npm run rebuild:question-counters
 npm run rebuild:comment-counters
 npm run recompute:reputation    # backfill UserProfile.reputation from answers
 ```
+
+## Contributors
+
+| # | Name |
+|---|------|
+| 1 | Samyabrata Roy |
+| 2 | Nandini |
+| 3 | SAMAD MOHAMMED |
+| 4 | Ansh Varshney |
+| 5 | Kashish Panwar |
+| 6 | Shreya Choudhary |
+| 7 | Rahul Prasad |
+| 8 | Abhi Sriya |
+| 9 | Adhin Mahesh |
+| 10 | Udarsh Goyal |

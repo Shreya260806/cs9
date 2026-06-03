@@ -10,7 +10,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "▶ Starting backend (port 5000)..."
 cd "$ROOT/backend"
-node src/server.js &
+PORT=5000 node src/server.js &
 BACKEND_PID=$!
 
 echo "    pid: $BACKEND_PID"

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CornerDownRight, MessageSquare } from 'lucide-react'
+import { parseMarkdown } from '../../../../lib/markdown'
 
 function initialsOf(name = '') {
   return name.trim().split(/\s+/).map(n => n[0]).slice(0, 2).join('').toUpperCase() || 'U'
@@ -97,7 +98,7 @@ function AnswerComments({ answerId, comments = [], currentUserId, locked = false
           {hidden ? (
             <p className="text-[12px] italic leading-5 text-text-muted">{tombstone}</p>
           ) : (
-            <p className="text-[12px] leading-5 text-text-secondary" dangerouslySetInnerHTML={{ __html: c.body }} />
+            <p className="markdown-body text-[12px] leading-5 text-text-secondary" dangerouslySetInnerHTML={{ __html: parseMarkdown(c.body) }} />
           )}
           {/* Only visible top-level comments can receive a (one-level) reply */}
           {!isReply && !hidden && !locked && (
