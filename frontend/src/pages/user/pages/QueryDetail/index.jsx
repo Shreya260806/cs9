@@ -2,14 +2,16 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useOutletContext, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, Check, CheckCircle, RotateCcw, ChevronUp, ChevronDown,
-  AlertTriangle, MessageCircle, Loader,
+  AlertTriangle, MessageCircle, Loader, Pencil, Trash2,
 } from 'lucide-react'
 import ReportModal from '../../components/ReportModal/ReportModal'
 import AnswerComments from '../../components/AnswerComments/AnswerComments'
 import Button from '../../../../components/Button/Button'
+import Modal from '../../../../components/Modal/Modal'
 import {
   fetchQuestionDetail, fetchQuestions, postAnswer, voteAnswer, reportContent, postComment,
-  resolveQuestion, acceptAnswer, recordQuestionView,
+  resolveQuestion, acceptAnswer, recordQuestionView, updateComment, deleteComment,
+  updateAnswer, deleteAnswer,
 } from '../../service'
 import { notifySuccess, notifyError } from '../../../../lib/notify'
 import { parseMarkdown } from '../../../../lib/markdown'
@@ -153,6 +155,46 @@ function QueryDetailPage() {
       await refresh()
     } catch (err) {
       notifyError(err.response?.data?.message || 'Could not post comment.')
+    }
+  }
+
+  async function handleEditComment(commentId, body) {
+    try {
+      await updateComment(commentId, body)
+      await refresh()
+      notifySuccess('Comment updated.')
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Could not update comment.')
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    try {
+      await deleteComment(commentId)
+      await refresh()
+      notifySuccess('Comment deleted.')
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Could not delete comment.')
+    }
+  }
+
+  async function handleEditAnswer(answerId, body) {
+    try {
+      await updateAnswer(answerId, body)
+      await refresh()
+      notifySuccess('Answer updated.')
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Could not update answer.')
+    }
+  }
+
+  async function handleDeleteAnswer(answerId) {
+    try {
+      await deleteAnswer(answerId)
+      await refresh()
+      notifySuccess('Answer deleted.')
+    } catch (err) {
+      notifyError(err.response?.data?.message || 'Could not delete answer.')
     }
   }
 
@@ -365,6 +407,9 @@ function QueryDetailPage() {
                   onVoteDown={() => handleVote(ans.answer_id, 'down')}
                   authorRole={ans.author_role}
                   onReport={() => setReportTarget({ type: 'answer', id: ans.answer_id })}
+                  onEdit={body => handleEditAnswer(ans.answer_id, body)}
+                  onDelete={() => handleDeleteAnswer(ans.answer_id)}
+                  createdAt={ans.created_at}
                 >
                   {!hidden && (
                     <AnswerComments
@@ -373,6 +418,8 @@ function QueryDetailPage() {
                       currentUserId={user?.userId}
                       locked={isResolved}
                       onSubmit={handleComment}
+                      onEdit={handleEditComment}
+                      onDelete={handleDeleteComment}
                     />
                   )}
                 </ThreadItem>
@@ -524,13 +571,29 @@ function QueryDetailPage() {
 // ── Thread item (OP or answer) ──────────────────────────────────────────────
 function ThreadItem({
   authorName, isSelf, authorRole, date, body, isOriginal, accepted, score, myVote = 0,
-  moderationState = 'visible', canAccept = false, onAccept, onVoteUp, onVoteDown, onReport, children,
+  moderationState = 'visible', canAccept = false, onAccept, onVoteUp, onVoteDown, onReport,
+  onEdit, onDelete, createdAt, children,
 }) {
   const initials = initialsOf(authorName)
   const hidden = moderationState !== 'visible'
   const tombstone = moderationState === 'deleted'
     ? `This reply from ${authorName} was deleted.`
     : `This reply from ${authorName} is under review.`
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [editText, setEditText] = useState(body || '')
+  const [editBusy, setEditBusy] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const isEditable = () => {
+    if (!isSelf) return false
+    if (hidden) return false
+    if (!createdAt) return false
+    const createdTime = new Date(createdAt).getTime()
+    const diffMs = Date.now() - createdTime
+    return diffMs <= 15 * 60 * 1000
+  }
 
   return (
     <div className="relative mb-8">
@@ -565,6 +628,43 @@ function ThreadItem({
         {/* Body — tombstone when hidden */}
         {hidden ? (
           <p className="px-5 py-5 text-[13px] italic leading-6 text-text-muted">{tombstone}</p>
+        ) : isEditing ? (
+          <div className="px-5 py-5">
+            <textarea
+              autoFocus
+              value={editText}
+              onChange={e => setEditText(e.target.value)}
+              className="min-h-[100px] w-full resize-y rounded-lg border border-border-light p-3 text-[14px] leading-6 text-text-primary outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/15"
+            />
+            <div className="mt-3 flex gap-2">
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  if (!editText.trim()) return
+                  setEditBusy(true)
+                  try {
+                    if (onEdit) {
+                      await onEdit(editText.trim())
+                    }
+                    setIsEditing(false)
+                  } finally {
+                    setEditBusy(false)
+                  }
+                }}
+                disabled={editBusy}
+                className="min-h-9 px-4 text-xs font-semibold cursor-pointer"
+              >
+                {editBusy ? 'Saving…' : 'Save'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setIsEditing(false)}
+                className="min-h-9 px-4 text-xs font-medium cursor-pointer"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         ) : (
           <div
             className="markdown-body px-5 py-5 text-[14px] leading-6 text-text-secondary"
@@ -610,9 +710,37 @@ function ThreadItem({
                 </button>
               )}
               {isSelf ? (
-                <span className="text-[11px] italic text-text-muted">
-                  Cannot report own {isOriginal ? 'question' : 'reply'}
-                </span>
+                isOriginal ? (
+                  // Edit/delete of the original question is out of scope here;
+                  // keep the report-own-question affordance from the report feature.
+                  <span className="text-[11px] italic text-text-muted">
+                    Cannot report own question
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {isEditable() && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(true)
+                          setEditText(body)
+                        }}
+                        className="flex items-center gap-1.5 rounded-lg border border-border-light bg-bg-secondary px-2.5 py-1 text-[11px] font-semibold text-text-secondary transition-all duration-200 hover:border-brand hover:text-brand hover:bg-brand/5 shadow-xs cursor-pointer"
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-text-muted transition-colors hover:text-brand" strokeWidth={1.8} />
+                        <span className="leading-none">Edit</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 rounded-lg border border-border-light bg-bg-secondary px-2.5 py-1 text-[11px] font-semibold text-text-secondary transition-all duration-200 hover:border-danger hover:text-danger hover:bg-danger/5 shadow-xs cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-text-muted transition-colors hover:text-danger" strokeWidth={1.8} />
+                      <span className="leading-none">Delete</span>
+                    </button>
+                  </div>
+                )
               ) : authorRole === 'ADMIN' ? (
                 <span className="text-[11px] italic text-text-muted">Cannot report admin</span>
               ) : (
@@ -631,6 +759,49 @@ function ThreadItem({
         {/* Comments / replies under this answer */}
         {!isOriginal && children}
       </div>
+
+      {/* Premium Deletion Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete Answer"
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600 mb-4 dark:bg-red-950/30 dark:text-red-400">
+            <AlertTriangle className="h-6 w-6" strokeWidth={1.8} />
+          </div>
+          <h3 className="text-[16px] font-bold text-text-primary mb-2">Delete Answer</h3>
+          <p className="text-[13px] text-text-muted mb-6 leading-5">
+            Are you sure you want to delete this answer? This action cannot be undone.
+          </p>
+          <div className="flex w-full gap-3 justify-center">
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteConfirm(false)}
+              className="flex-1 py-2 text-xs font-semibold cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setDeleteBusy(true)
+                try {
+                  if (onDelete) {
+                    await onDelete()
+                  }
+                  setShowDeleteConfirm(false)
+                } finally {
+                  setDeleteBusy(false)
+                }
+              }}
+              disabled={deleteBusy}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 text-xs font-semibold focus:ring-red-500 cursor-pointer disabled:opacity-60"
+            >
+              {deleteBusy ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

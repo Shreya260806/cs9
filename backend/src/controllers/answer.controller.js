@@ -101,6 +101,13 @@ export async function updateAnswer(req, res, next) {
     if (!canManage(req, answer)) {
       throw createHttpError(403, 'Forbidden')
     }
+    if (!isAdmin(req)) {
+      const createdTime = new Date(answer.created_at).getTime()
+      const diffMs = Date.now() - createdTime
+      if (diffMs > 15 * 60 * 1000) {
+        throw createHttpError(403, 'Answers can only be edited within 15 minutes of posting')
+      }
+    }
     if (answer.is_accepted && !isAdmin(req)) {
       throw createHttpError(409, 'Answer locked')
     }
@@ -140,7 +147,7 @@ export async function deleteAnswer(req, res, next) {
 
     answer.is_deleted = true
     answer.moderation_status = 'rejected'
-    answer.removal_reason = req.body.reason || ''
+    answer.removal_reason = req.body?.reason || ''
     await answer.save()
 
     // Sync parent question counters

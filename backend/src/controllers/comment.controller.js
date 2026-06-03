@@ -162,6 +162,13 @@ export async function updateComment(req, res, next) {
     if (!isAdmin(req) && comment.author_id !== req.user.userId) {
       throw createHttpError(403, 'Forbidden')
     }
+    if (!isAdmin(req)) {
+      const createdTime = new Date(comment.created_at).getTime()
+      const diffMs = Date.now() - createdTime
+      if (diffMs > 15 * 60 * 1000) {
+        throw createHttpError(403, 'Comments can only be edited within 15 minutes of posting')
+      }
+    }
     if (!body) {
       throw createHttpError(400, 'Comment body is required')
     }

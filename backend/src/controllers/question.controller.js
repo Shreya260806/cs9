@@ -522,7 +522,7 @@ export async function deleteQuestion(req, res, next) {
 
     question.status = 'removed'
     question.moderation_status = 'rejected'
-    question.removal_reason = req.body.reason || ''
+    question.removal_reason = req.body?.reason || ''
     await question.save()
 
     res.json({ success: true, message: 'Question deleted' })
