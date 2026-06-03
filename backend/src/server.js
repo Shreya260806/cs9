@@ -1,6 +1,4 @@
-// 1. Force Node.js to use Google's public DNS (Fixes MongoDB querySrv bug on Windows)
-import dns from 'node:dns'
-dns.setServers(['8.8.8.8', '8.8.4.4'])
+import './dns-init.js'
 
 // 2. Load the rest of your app
 import 'dotenv/config'
