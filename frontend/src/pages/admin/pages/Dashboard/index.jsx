@@ -125,7 +125,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
         </div>
       </div>
 
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-tour="admin-kpis" className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Community Queries"
           value={formatNumber(questionMetrics.community)}
@@ -160,7 +160,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
         />
       </div>
 
-      <section className="mb-8 overflow-hidden rounded-lg border border-border-light bg-bg-card shadow-sm">
+      <section data-tour="admin-unresolved" className="mb-8 overflow-hidden rounded-lg border border-border-light bg-bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b border-border-light px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-[17px] font-bold text-text-primary">Unresolved Queries</h2>
@@ -220,7 +220,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
         </div>
       </section>
 
-      <div className="mb-8 grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div data-tour="admin-charts" className="mb-8 grid grid-cols-1 gap-5 xl:grid-cols-2">
         <section className="rounded-lg border border-border-light bg-bg-card p-5 shadow-sm">
           <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-[17px] font-bold text-text-primary">Query Volume by Category</h2>
@@ -343,7 +343,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
       </div>
 
 
-      <section className="overflow-hidden rounded-lg border border-border-light bg-bg-card shadow-sm">
+      <section data-tour="admin-moderation" className="overflow-hidden rounded-lg border border-border-light bg-bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b border-border-light px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-[17px] font-bold text-text-primary">Needs Attention</h2>
@@ -407,7 +407,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
         </div>
       </section>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-tour="admin-stats-summary" className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-border-light bg-bg-card p-4">
           <p className="text-[11px] font-bold uppercase tracking-wide text-text-muted">Users</p>
           <p className="mt-2 text-[22px] font-semibold text-text-primary">
@@ -431,6 +431,7 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
           </p>
         </div>
         <button
+          data-tour="admin-settings-shortcut"
           type="button"
           onClick={() => onNavigate?.('settings')}
           className="rounded-lg border border-border-light bg-bg-card p-4 text-left transition hover:border-brand hover:shadow-md"

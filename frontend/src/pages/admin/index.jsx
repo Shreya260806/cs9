@@ -13,6 +13,7 @@ import SparkLeaderboardView from './pages/SparkLeaderboard'
 import UserManagementView from './pages/UserManagement'
 import AdminProfileView from './pages/AdminProfile'
 import AdminSettingsView from './pages/Settings'
+import AdminOnboardingTour from './components/OnboardingTour/AdminOnboardingTour'
 import {
   ADMIN_ROUTE_PATHS,
   adminPathForQuery,
@@ -52,6 +53,7 @@ function AdminHome() {
   const [searchQuery, setSearchQuery] = useState('')
   const [notifSidebarOpen, setNotifSidebarOpen] = useState(false)
   const [isLeftPaneCollapsed, setIsLeftPaneCollapsed] = useState(false)
+  const [isTourActive, setIsTourActive] = useState(false)
 
   const initials = user?.name
     ? user.name
@@ -80,6 +82,19 @@ function AdminHome() {
       navigate(ADMIN_ROUTE_PATHS.dashboard, { replace: true })
     }
   }, [location.pathname, navigate, resolvedAdminView])
+
+  useEffect(() => {
+    if (!user?.userId) return
+    // Allow tour to trigger on both /admin and /admin/dashboard
+    if (location.pathname !== '/admin/dashboard' && location.pathname !== '/admin' && location.pathname !== '/admin/') return
+    const isCompleted = localStorage.getItem(`rogare-admin-tour-completed-${user.userId}`) === 'true'
+    if (!isCompleted) {
+      const timer = setTimeout(() => {
+        setIsTourActive(true)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [user?.userId, location.pathname])
 
   useEffect(() => {
     let isActive = true
@@ -214,6 +229,7 @@ function AdminHome() {
           onLanding={() => navigate('/')}
           onLogout={handleLogout}
           onProfileSettings={handleProfileSettings}
+          onStartTour={() => setIsTourActive(true)}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -246,6 +262,12 @@ function AdminHome() {
           handleNotifSidebarClose()
           navigateAdmin(view)
         }}
+      />
+
+      <AdminOnboardingTour
+        userId={user?.userId}
+        isActive={isTourActive}
+        onClose={() => setIsTourActive(false)}
       />
     </div>
   )
