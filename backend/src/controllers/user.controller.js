@@ -214,20 +214,41 @@ export async function getUserContributions(req, res, next) {
     const questionFilter = {
       author_id: userId,
       visibility: { $ne: 'deleted' },
-      status: { $ne: 'removed' },
     }
-    if (!isSelfOrAdmin) {
+    if (isSelfOrAdmin) {
+      questionFilter.$or = [
+        { status: { $ne: 'removed' } },
+        { status: 'removed', moderation_status: 'rejected', moderated_by: { $exists: true, $ne: null } }
+      ]
+    } else {
+      questionFilter.status = { $ne: 'removed' }
       questionFilter.is_anonymous = { $ne: true }
     }
+
     const answerFilter = {
       author_id: userId,
-      is_deleted: { $ne: true },
       visibility: { $ne: 'deleted' },
     }
+    if (isSelfOrAdmin) {
+      answerFilter.$or = [
+        { is_deleted: { $ne: true } },
+        { is_deleted: true, moderation_status: 'rejected', moderated_by: { $exists: true, $ne: null } }
+      ]
+    } else {
+      answerFilter.is_deleted = { $ne: true }
+    }
+
     const commentFilter = {
       author_id: userId,
-      is_deleted: { $ne: true },
       visibility: { $ne: 'deleted' },
+    }
+    if (isSelfOrAdmin) {
+      commentFilter.$or = [
+        { is_deleted: { $ne: true } },
+        { is_deleted: true, moderation_status: 'rejected', moderated_by: { $exists: true, $ne: null } }
+      ]
+    } else {
+      commentFilter.is_deleted = { $ne: true }
     }
 
     const [
@@ -240,17 +261,17 @@ export async function getUserContributions(req, res, next) {
       acceptedAnswersCount,
     ] = await Promise.all([
       Question.find(questionFilter)
-        .select('question_id title body status upvotes answer_count created_at')
+        .select('question_id title body status upvotes answer_count created_at moderation_status moderated_by')
         .sort({ created_at: -1 })
         .limit(limit)
         .lean(),
       Answer.find(answerFilter)
-        .select('answer_id question_id body upvotes score comment_count is_accepted created_at')
+        .select('answer_id question_id body upvotes score comment_count is_accepted created_at moderation_status moderated_by')
         .sort({ created_at: -1 })
         .limit(limit)
         .lean(),
       Comment.find(commentFilter)
-        .select('comment_id question_id answer_id body score reply_count created_at')
+        .select('comment_id question_id answer_id body score reply_count created_at moderation_status moderated_by')
         .sort({ created_at: -1 })
         .limit(limit)
         .lean(),
@@ -270,6 +291,7 @@ export async function getUserContributions(req, res, next) {
         score: q.upvotes || 0,
         answerCount: q.answer_count || 0,
         time: q.created_at,
+        isUpheld: q.moderation_status === 'rejected' && typeof q.moderated_by === 'string' && q.moderated_by.length > 0,
       })),
       ...answers.map(a => ({
         type: 'answer',
@@ -280,6 +302,7 @@ export async function getUserContributions(req, res, next) {
         commentCount: a.comment_count || 0,
         isAccepted: a.is_accepted,
         time: a.created_at,
+        isUpheld: a.moderation_status === 'rejected' && typeof a.moderated_by === 'string' && a.moderated_by.length > 0,
       })),
       ...comments.map(c => ({
         type: 'comment',
@@ -290,6 +313,7 @@ export async function getUserContributions(req, res, next) {
         score: c.score || 0,
         replyCount: c.reply_count || 0,
         time: c.created_at,
+        isUpheld: c.moderation_status === 'rejected' && typeof c.moderated_by === 'string' && c.moderated_by.length > 0,
       })),
     ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, limit)
 

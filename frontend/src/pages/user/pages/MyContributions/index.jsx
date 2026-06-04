@@ -223,7 +223,8 @@ function MyContributionsPage() {
               </p>
             ) : (
               paginated.map(item => {
-                const { icon: Icon, label, color } = TYPE_META[item.type] ?? TYPE_META.question
+                const { icon: Icon, label, color: baseColor } = TYPE_META[item.type] ?? TYPE_META.question
+                const color = item.isUpheld ? '#dc2626' : baseColor
                 return (
                   <div
                     key={`${item.type}-${item.id}`}
