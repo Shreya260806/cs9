@@ -717,10 +717,25 @@ export async function adminSeekApproval(req, res, next) {
       throw createHttpError(400, 'Admin ID and Name are required')
     }
 
+    // Validate adminId belongs to a real ADMIN user
+    const targetAdmin = await User.findOne({ user_id: adminId })
+    if (!targetAdmin) {
+      throw createHttpError(404, 'Admin not found')
+    }
+
     const question = await Question.findOne({ question_id: req.params.questionId })
 
     if (!question || question.status === 'removed') {
       throw createHttpError(404, 'Question not found')
+    }
+
+    // Prevent duplicate pending approvals for the same question
+    const existingApproval = await Approval.findOne({
+      question_id: question.question_id,
+      status: 'pending',
+    })
+    if (existingApproval) {
+      throw createHttpError(400, 'Approval already requested for this question')
     }
 
     await Question.updateOne(
@@ -764,6 +779,10 @@ export async function adminMarkApprovalReceived(req, res, next) {
 
     if (!question.approval_requested_from) {
       throw createHttpError(400, 'This question is not currently under approval')
+    }
+
+    if (question.approval_requested_from !== req.user.userId) {
+      throw createHttpError(403, 'Only the requested admin can mark approval')
     }
 
     // Update the most recent pending approval record
