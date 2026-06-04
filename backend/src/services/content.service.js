@@ -80,7 +80,15 @@ export async function applyModerationAction({
   }
 
   if (action === 'hide' || action === 'delete') {
+    updates.moderation_status = 'rejected'
+    if (targetType === 'question') {
+      updates.status = 'removed'
+    }
+    if (targetType === 'comment') {
+      updates.is_deleted = true
+    }
     if (targetType === 'answer') {
+      updates.is_deleted = true
       const answer = await Answer.findOne({ answer_id: targetId }).select('question_id is_expert')
       if (answer) {
         await Question.updateOne(
