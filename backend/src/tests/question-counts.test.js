@@ -17,7 +17,7 @@ test('non-admin base filter applies the moderation gate', async () => {
 
 test('admin base filter omits the moderation gate', async () => {
   const filter = await buildQuestionBaseFilter(makeReq({ roles: ['ADMIN'] }))
-  assert.deepEqual(filter, { kind: 'community' })
+  assert.deepEqual(filter, { kind: 'community', moderation_status: { $ne: 'rejected' } })
 })
 
 test('kind is passed through to the filter', async () => {

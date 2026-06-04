@@ -179,6 +179,8 @@ export async function buildQuestionBaseFilter(req) {
 
   if (!isAdmin(req)) {
     filter.moderation_status = 'approved'
+  } else {
+    filter.moderation_status = { $ne: 'rejected' }
   }
 
   return filter
