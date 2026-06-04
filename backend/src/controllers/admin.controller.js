@@ -82,7 +82,7 @@ async function hourlyTrafficAggregation(since24h) {
   return allHours.map(hour => ({
     hour,                          // e.g. "2026-05-31 22:00"
     questions: qMap[hour] ?? 0,
-    answers: aMap[hour] ?? 0,
+    answers: (aMap[hour] ?? 0) + (cMap[hour] ?? 0),
     comments: cMap[hour] ?? 0,
   }))
 }

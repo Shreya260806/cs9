@@ -326,15 +326,6 @@ function DashboardView({ dashboardData, isLoading, onRefresh, onNavigate }) {
                   dot={false}
                   activeDot={{ r: 4 }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="comments"
-                  name="Comments"
-                  stroke="#d97706"
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
               </LineChart>
             </ResponsiveContainer>
           </div>
