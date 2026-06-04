@@ -64,6 +64,19 @@ const questionSchema = new mongoose.Schema(
 
     tags: [String],
 
+    attachments: [
+      {
+        attachment_id: {
+          type: String,
+          default: randomUUID,
+          immutable: true,
+        },
+        file_name: String,
+        mime_type: String,
+        data: Buffer,
+      },
+    ],
+
     spark_bounty: {
       type: Number,
       default: 0,

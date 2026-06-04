@@ -10,6 +10,8 @@ import useAuthStore from '../../../../store/useAuthStore'
 import { parseMarkdown } from '../../../../lib/markdown'
 import Modal from '../../../../components/Modal/Modal'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 const STATUS_STYLE = {
   unanswered: 'bg-amber-50 text-amber-700',
   answered:   'bg-blue-50 text-blue-700',
@@ -448,6 +450,46 @@ function AdminQueryDetailView({ queryId, onBack }) {
                 <Tag className="h-2.5 w-2.5" strokeWidth={2} /> {t}
               </span>
             ))}
+          </div>
+        )}
+
+        {q.attachments && q.attachments.length > 0 && (
+          <div className="mt-4 rounded-xl border border-border-light bg-bg-primary p-4">
+            <h4 className="mb-3 text-[13px] font-semibold text-text-primary">Attachments</h4>
+            <ul className="space-y-2">
+              {q.attachments.map((attachment) => {
+                const downloadUrl = attachment.download_url?.startsWith('/api') && API_BASE_URL
+                  ? `${API_BASE_URL}${attachment.download_url}`
+                  : attachment.download_url
+
+                const previewUrl = `${downloadUrl}?preview=true`
+
+                return (
+                  <li key={attachment.attachment_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-border-light bg-bg-card px-4 py-3">
+                    <span className="text-[13px] font-medium text-text-primary truncate max-w-[280px] sm:max-w-[400px]" title={attachment.file_name}>
+                      {attachment.file_name}
+                    </span>
+                    <div className="flex gap-2">
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center rounded-lg bg-brand/10 px-3 py-1.5 text-[11px] font-bold text-brand transition-colors hover:bg-brand/20"
+                      >
+                        Preview
+                      </a>
+                      <a
+                        href={downloadUrl}
+                        download={attachment.file_name}
+                        className="inline-flex items-center justify-center rounded-lg border border-border-light px-3 py-1.5 text-[11px] font-bold text-text-secondary transition-colors hover:bg-bg-tertiary"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
         )}
 

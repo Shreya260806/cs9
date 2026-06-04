@@ -16,6 +16,8 @@ import {
 import { notifySuccess, notifyError } from '../../../../lib/notify'
 import { parseMarkdown } from '../../../../lib/markdown'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
+
 const STATUS_LABEL = {
   unanswered: 'Active',
   answered: 'In Progress',
@@ -390,6 +392,7 @@ function QueryDetailPage() {
               body={question.body}
               isOriginal
               moderationState="visible"
+              attachments={question.attachments}
               onReport={() => setReportTarget({ type: 'question', id: question.question_id })}
             />
 
@@ -418,6 +421,7 @@ function QueryDetailPage() {
                   onVoteUp={() => handleVote(ans.answer_id, 'up')}
                   onVoteDown={() => handleVote(ans.answer_id, 'down')}
                   authorRole={ans.author_role}
+                  attachments={ans.attachments}
                   onReport={() => setReportTarget({ type: 'answer', id: ans.answer_id })}
                   onEdit={body => handleEditAnswer(ans.answer_id, body)}
                   onDelete={() => handleDeleteAnswer(ans.answer_id)}
@@ -585,7 +589,7 @@ function ThreadItem({
   authorName, isSelf, authorRole, date, body, isOriginal, accepted, score, myVote = 0,
   moderationState = 'visible', canAccept = false, canUnaccept = false, onAccept, onUnaccept,
   onVoteUp, onVoteDown, onReport,
-  onEdit, onDelete, createdAt, children,
+  onEdit, onDelete, createdAt, attachments = [], children,
 }) {
   const initials = initialsOf(authorName)
   const hidden = moderationState !== 'visible'
@@ -682,10 +686,51 @@ function ThreadItem({
             </div>
           </div>
         ) : (
-          <div
-            className="markdown-body px-5 py-5 text-[14px] leading-6 text-text-secondary"
-            dangerouslySetInnerHTML={{ __html: parseMarkdown(body) }}
-          />
+          <div className="px-5 py-5">
+            <div
+              className="markdown-body text-[14px] leading-6 text-text-secondary"
+              dangerouslySetInnerHTML={{ __html: parseMarkdown(body) }}
+            />
+            {attachments.length > 0 && (
+              <div className="mt-4 rounded-2xl border border-border-light bg-bg-primary p-4">
+                <h4 className="mb-3 text-[13px] font-semibold text-text-primary">Attachments</h4>
+                <ul className="space-y-2">
+                  {attachments.map((attachment) => {
+                    const downloadUrl = attachment.download_url?.startsWith('/api') && API_BASE_URL
+                      ? `${API_BASE_URL}${attachment.download_url}`
+                      : attachment.download_url
+
+                    const previewUrl = `${downloadUrl}?preview=true`
+
+                    return (
+                      <li key={attachment.attachment_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-border-light bg-bg-card px-4 py-3">
+                        <span className="text-[13px] font-medium text-text-primary truncate max-w-[280px] sm:max-w-[400px]" title={attachment.file_name}>
+                          {attachment.file_name}
+                        </span>
+                        <div className="flex gap-2">
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center rounded-lg bg-brand/10 px-3 py-1.5 text-[11px] font-bold text-brand transition-colors hover:bg-brand/20"
+                          >
+                            Preview
+                          </a>
+                          <a
+                            href={downloadUrl}
+                            download={attachment.file_name}
+                            className="inline-flex items-center justify-center rounded-lg border border-border-light px-3 py-1.5 text-[11px] font-bold text-text-secondary transition-colors hover:bg-bg-tertiary"
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Footer (visible answers and original question) */}

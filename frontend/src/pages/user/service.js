@@ -109,8 +109,26 @@ export async function fetchQuestionTags() {
   return data.tags || []
 }
 
-export async function createQuestion({ title, body, tags = [], isAnonymous = false }) {
-  const { data } = await axisPrivate().post('/api/questions', { title, body, tags, isAnonymous })
+export async function createQuestion({ title, body, tags = [], isAnonymous = false, attachments = [] }) {
+  const client = axisPrivate()
+
+  if (attachments.length > 0) {
+    const formData = new FormData()
+    formData.append('title', title)
+    formData.append('body', body)
+    formData.append('isAnonymous', isAnonymous ? 'true' : 'false')
+    tags.forEach((tag) => formData.append('tags', tag))
+    attachments.forEach((file) => formData.append('attachments', file))
+
+    const { data } = await client.post('/api/questions', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return data
+  }
+
+  const { data } = await client.post('/api/questions', { title, body, tags, isAnonymous })
   return data // { success, questionId }
 }
 

@@ -17,6 +17,11 @@ export function errorHandler(error, _req, res, _next) {
       .join(', ')
   }
 
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    statusCode = 400
+    message = 'Attachments must be 5MB or smaller'
+  }
+
   if (error.code === 11000) {
     statusCode = 409
     message = 'A record with those values already exists'

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Field, Label, Textarea, Switch } from '@headlessui/react'
 import { CheckCircle2, Lightbulb, EyeOff, Image as ImageIcon, ExternalLink, Sparkles, Send, Bold, Italic, Link, Code, List } from 'lucide-react'
@@ -50,9 +50,11 @@ function RaiseQueryPage() {
   const [title, setTitle]           = useState('')
   const [description, setDescription] = useState('')
   const [anonymous, setAnonymous]   = useState(false)
+  const [attachments, setAttachments] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted]   = useState(false)
   const [activeTab, setActiveTab]   = useState('write')
+  const fileInputRef = useRef(null)
 
   function insertFormat(prefix, suffix = '') {
     const textarea = document.getElementById('query-description-textarea')
@@ -79,6 +81,47 @@ function RaiseQueryPage() {
   // Similar queries come from the cached dashboard questions (empty until the
   // dashboard has been visited; cleared + refetched when Dashboard is reopened).
   const cachedQuestions = queryClient.getQueryData(['dashboardQuestions']) || []
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  function handleFileChange(files) {
+    const maxSize = 5 * 1024 * 1024
+    const maxTotalSize = 12 * 1024 * 1024
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg']
+    const nextFiles = []
+
+    for (const file of Array.from(files)) {
+      if (!allowedTypes.includes(file.type)) {
+        notifyError('Only PDF, JPG and PNG files are allowed.')
+        continue
+      }
+      if (file.size > maxSize) {
+        notifyError(`File ${file.name} must be 5MB or smaller.`)
+        continue
+      }
+      nextFiles.push(file)
+    }
+
+    if (nextFiles.length) {
+      setAttachments((current) => {
+        const combined = [...current, ...nextFiles].slice(0, 5)
+        const totalSize = combined.reduce((sum, file) => sum + file.size, 0)
+        if (totalSize > maxTotalSize) {
+          notifyError('Total attachments must be 12MB or smaller.')
+          return current
+        }
+        return combined
+      })
+    }
+  }
+
+  function removeAttachment(index) {
+    setAttachments((current) => current.filter((_, idx) => idx !== index))
+  }
   const pool = category
     ? cachedQuestions.filter(q => q.tags?.some(t => t.label.toLowerCase() === category.toLowerCase()))
     : cachedQuestions
@@ -100,7 +143,13 @@ function RaiseQueryPage() {
 
     setSubmitting(true)
     try {
-      await createQuestion({ title: title.trim(), body: description.trim(), tags: [category], isAnonymous: anonymous })
+      await createQuestion({
+        title: title.trim(),
+        body: description.trim(),
+        tags: [category],
+        isAnonymous: anonymous,
+        attachments,
+      })
       setSubmitted(true)
       setTimeout(() => navigate('/dashboard'), 2500)
     } catch (err) {
@@ -245,18 +294,53 @@ function RaiseQueryPage() {
             )}
           </Field>
 
-          {/* Attachments (not supported yet) */}
           <Field className="flex flex-col">
             <Label className="mb-2 text-[13px] font-semibold text-text-secondary">Attachments (Optional)</Label>
-            <button
-              type="button"
-              onClick={() => notifyError('Attachments are not supported yet.')}
-              className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-bg-card px-4 py-10 text-center transition hover:border-brand hover:bg-brand/5"
-            >
-              <ImageIcon className="h-7 w-7 text-text-muted" strokeWidth={1.6} />
-              <span className="text-[13px] font-bold text-text-primary">Click or drag and drop files here</span>
-              <span className="text-[12px] text-text-muted">PDF, JPG, PNG (Max 5MB)</span>
-            </button>
+            <div className="rounded-xl border-2 border-dashed border-border bg-bg-card p-4">
+              <div className="flex flex-col items-center justify-center gap-2 rounded-xl px-4 py-10 text-center transition hover:border-brand hover:bg-brand/5">
+                <ImageIcon className="h-7 w-7 text-text-muted" strokeWidth={1.6} />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[13px] font-bold text-text-primary underline-offset-4 hover:text-brand"
+                >
+                  Choose files
+                </button>
+                <span className="text-[12px] text-text-muted">PDF, JPG, PNG (Max 5MB each, 12MB total)</span>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="application/pdf,image/png,image/jpeg"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    handleFileChange(e.target.files)
+                    e.target.value = ''
+                  }
+                }}
+              />
+              {attachments.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {attachments.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-xl bg-bg-primary px-4 py-3 text-sm text-text-secondary">
+                      <div>
+                        <p className="font-medium text-text-primary">{file.name}</p>
+                        <p className="text-[11px] text-text-muted">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(index)}
+                        className="text-[11px] font-semibold text-brand transition hover:text-brand/80"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </Field>
 
           {/* Raise anonymously */}
