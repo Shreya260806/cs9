@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Users, Search, ShieldCheck, ChevronLeft, ChevronRight, Loader,
-  Check, Zap, Mail, Calendar, UserCog, Plus, CornerDownLeft, Filter,
+  Check, Zap, Mail, Calendar, UserCog, Plus, CornerDownLeft, Filter, Eye, EyeOff,
 } from 'lucide-react'
 import Modal from '../../../../components/Modal/Modal'
 import Button from '../../../../components/Button/Button'
@@ -60,6 +60,7 @@ function UserManagementView() {
   const [creating, setCreating]     = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'USER' })
   const [creatingSaving, setCreatingSaving] = useState(false)
+  const [showPassword, setShowPassword]     = useState(false)
 
   // Debounce the search box.
   useEffect(() => {
@@ -465,13 +466,26 @@ function UserManagementView() {
             </div>
             <div className="group">
               <label className={LABEL_CLS}>PASSWORD</label>
-              <input
-                className={INPUT_CLS}
-                type="password"
-                value={createForm.password}
-                onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-                placeholder="Set a strong password"
-              />
+              <div className="relative flex items-center">
+                <input
+                  className={`${INPUT_CLS} pr-10`}
+                  type={showPassword ? 'text' : 'password'}
+                  value={createForm.password}
+                  onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Set a strong password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 flex h-7 w-7 items-center justify-center rounded text-text-muted transition hover:text-text-primary"
+                >
+                  {showPassword
+                    ? <EyeOff className="h-4 w-4" strokeWidth={1.8} />
+                    : <Eye className="h-4 w-4" strokeWidth={1.8} />
+                  }
+                </button>
+              </div>
             </div>
             <div className="group">
               <label className={LABEL_CLS}>INITIAL ROLE</label>
