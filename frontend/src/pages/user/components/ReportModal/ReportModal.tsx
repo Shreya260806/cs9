@@ -18,11 +18,12 @@ interface ReportModalProps {
   onClose: () => void
   onSubmit: (payload: { reason: string; description: string }) => void
   submitting: boolean
+  targetType?: 'question' | 'answer'
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-const ReportModal: FC<ReportModalProps> = ({ open, onClose, onSubmit, submitting }) => {
+const ReportModal: FC<ReportModalProps> = ({ open, onClose, onSubmit, submitting, targetType }) => {
   const [reason, setReason]   = useState('')
   const [details, setDetails] = useState('')
 
@@ -30,11 +31,15 @@ const ReportModal: FC<ReportModalProps> = ({ open, onClose, onSubmit, submitting
     onSubmit({ reason, description: details })
   }
 
+  const filteredReasons = targetType === 'question'
+    ? REASONS.filter(r => r.value !== 'incorrect')
+    : REASONS
+
   return (
     <Modal isOpen={open} onClose={onClose} position="center" title="Report Content">
       {/* Reason dropdown */}
       <Select
-        options={[...REASONS]}
+        options={[...filteredReasons]}
         value={reason}
         onChange={setReason}
         placeholder="Select a reason"
